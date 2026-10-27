@@ -69,23 +69,150 @@ def extract_text_from_segments(segments):
             lines.append("[图片]")
     return " ".join(lines).strip()
 
+
+async def get_forward_content(ws, forward_id, depth=0, max_depth=3):
+    """
+    递归解构合并转发消息 (全面支持嵌套合并转发、嵌套图包、多层嵌套)
+    """
+    if depth > max_depth:
+        return "", []
+
+    resp = await call_api(ws, "get_forward_msg", {"id": str(forward_id)})
+    if not resp or resp.get("status") != "ok":
+        return "", []
+
+    messages = resp.get("data", {}).get("messages", [])
+    lines = []
+    forward_images = []
+
+    async def parse_node_list(nodes, sub_depth):
+        if sub_depth > max_depth:
+            return
+
+        for m in nodes[:25]:
+            s_name = (m.get("sender") or {}).get("card") or (m.get("sender") or {}).get("nickname") or "某人"
+            msg_body = m.get("message")
+            m_raw = m.get("raw_message", "")
+
+            node_imgs = []
+            node_texts = []
+
+            # 1. 结构化 message 数组解析
+            if isinstance(msg_body, list):
+                for s in msg_body:
+                    if not isinstance(s, dict): continue
+                    st = s.get("type")
+                    sd = s.get("data", {}) or {}
+
+                    if st in ["image", "mface", "marketface", "bface"]:
+                        u = sd.get("url") or ""
+                        f = sd.get("file") or ""
+                        if u and isinstance(u, str) and u.startswith("http"):
+                            node_imgs.append(html.unescape(u).strip())
+                        elif f and isinstance(f, str):
+                            if f.startswith("http"):
+                                node_imgs.append(html.unescape(f).strip())
+                            else:
+                                try:
+                                    img_r = await call_api(ws, "get_image", {"file": f}, timeout=2.5)
+                                    if img_r and isinstance(img_r.get("data"), dict) and img_r["data"].get("url"):
+                                        direct_url = html.unescape(img_r["data"]["url"]).strip()
+                                        if direct_url.startswith("http"):
+                                            node_imgs.append(direct_url)
+                                except Exception:
+                                    pass
+
+                    elif st == "forward":
+                        # 核心突破：递归解构嵌套合并转发/嵌套图包
+                        sub_content = sd.get("content")
+                        if isinstance(sub_content, list) and sub_content:
+                            await parse_node_list(sub_content, sub_depth + 1)
+                        elif sd.get("id"):
+                            _, sub_imgs = await get_forward_content(ws, sd["id"], sub_depth + 1, max_depth)
+                            node_imgs.extend(sub_imgs)
+
+                    elif st == "node":
+                        sub_content = sd.get("content") or sd.get("message")
+                        if isinstance(sub_content, list) and sub_content:
+                            await parse_node_list(sub_content, sub_depth + 1)
+
+                    elif st == "text":
+                        t = sd.get("text", "").strip()
+                        if t: node_texts.append(t)
+
+            # 2. CQ 码兜底 (提取内嵌 forward 与 image)
+            if m_raw:
+                for match in re.finditer(r"\[CQ:(?:image|mface|marketface)[^]]*url=([^,\]]+)", m_raw):
+                    clean_u = html.unescape(match.group(1)).strip()
+                    if clean_u not in node_imgs: node_imgs.append(clean_u)
+
+                for match in re.finditer(r"\[CQ:forward,id=([^,\]]+)\]", m_raw):
+                    nested_fid = match.group(1).strip()
+                    if nested_fid != str(forward_id):
+                        _, sub_imgs = await get_forward_content(ws, nested_fid, sub_depth + 1, max_depth)
+                        for u in sub_imgs:
+                            if u not in node_imgs: node_imgs.append(u)
+
+            for u in node_imgs:
+                if u not in forward_images:
+                    forward_images.append(u)
+
+            txt = " ".join(node_texts).strip()
+            if node_imgs and not txt:
+                txt = f"[图包图片 x{len(node_imgs)}]"
+            elif node_imgs:
+                txt += f" [附图 x{len(node_imgs)}]"
+
+            if txt:
+                lines.append(f"{s_name}: {txt}")
+
+    await parse_node_list(messages, depth)
+    summary_header = "【嵌套合并转发图包内容】:" if depth > 0 else "【合并转发内容】:"
+    return summary_header + "\n" + "\n".join(lines[:25]), forward_images
+
 async def get_msg_content(ws, msg_id):
+    """
+    获取单条消息内容并提取图片与嵌套合并转发
+    """
     resp = await call_api(ws, "get_msg", {"message_id": msg_id})
     if not resp or resp.get("status") != "ok": return "", []
     data = resp.get("data", {})
     message_content = data.get("message", [])
     raw_str = data.get("raw_message", "")
     sub_imgs = []
+
     if isinstance(message_content, list):
         for s in message_content:
             if not isinstance(s, dict): continue
-            if s.get("type") == "image":
-                u = s.get("data", {}).get("url") or s.get("data", {}).get("file") or ""
+            st = s.get("type")
+            sd = s.get("data", {}) or {}
+            if st in ["image", "mface", "marketface", "bface"]:
+                u = sd.get("url") or sd.get("file") or ""
                 if isinstance(u, str) and u.startswith("http"):
                     sub_imgs.append(html.unescape(u).strip())
+                elif sd.get("file"):
+                    try:
+                        img_r = await call_api(ws, "get_image", {"file": sd["file"]}, timeout=2.5)
+                        if img_r and isinstance(img_r.get("data"), dict) and img_r["data"].get("url"):
+                            direct_u = html.unescape(img_r["data"]["url"]).strip()
+                            if direct_u.startswith("http"):
+                                sub_imgs.append(direct_u)
+                    except Exception:
+                        pass
+            elif st == "forward":
+                fid = sd.get("id")
+                if fid:
+                    _, f_imgs = await get_forward_content(ws, fid)
+                    sub_imgs.extend(f_imgs)
+
     if raw_str:
-        for m in re.finditer(r"\[CQ:image,[^]]*url=([^,\]]+)", raw_str):
+        for m in re.finditer(r"\[CQ:(?:image|mface|marketface)[^]]*url=([^,\]]+)", raw_str):
             sub_imgs.append(html.unescape(m.group(1)).strip())
+        for m in re.finditer(r"\[CQ:forward,id=([^,\]]+)\]", raw_str):
+            fid = m.group(1).strip()
+            _, f_imgs = await get_forward_content(ws, fid)
+            sub_imgs.extend(f_imgs)
+
     dedup_imgs = list(dict.fromkeys(sub_imgs))
     text = ""
     if isinstance(message_content, list):
@@ -93,39 +220,3 @@ async def get_msg_content(ws, msg_id):
     if not text and raw_str:
         text = re.sub(r"\[CQ:[^]]+\]", "", raw_str).strip()
     return text, dedup_imgs
-
-async def get_forward_content(ws, forward_id):
-    resp = await call_api(ws, "get_forward_msg", {"id": forward_id})
-    if not resp or resp.get("status") != "ok": return "", []
-    messages = resp.get("data", {}).get("messages", [])
-    lines = []
-    forward_images = []
-    for m in messages[:8]:
-        s_name = m.get("sender", {}).get("nickname", "某人")
-        msg_body = m.get("message")
-        m_raw = m.get("raw_message", "")
-        f_imgs = []
-        if isinstance(msg_body, list):
-            for s in msg_body:
-                if isinstance(s, dict) and s.get("type") == "image":
-                    u = s.get("data", {}).get("url") or s.get("data", {}).get("file") or ""
-                    if isinstance(u, str) and u.startswith("http"):
-                        f_imgs.append(html.unescape(u).strip())
-        if m_raw:
-            for match in re.finditer(r"\[CQ:image,[^]]*url=([^,\]]+)", m_raw):
-                f_imgs.append(html.unescape(match.group(1)).strip())
-        for u in f_imgs:
-            if u not in forward_images: forward_images.append(u)
-        line_text = ""
-        if isinstance(msg_body, list):
-            line_text = extract_text_from_segments(msg_body)
-        if not line_text and m_raw:
-            line_text = re.sub(r"\[CQ:[^]]+\]", "", m_raw).strip()
-        if f_imgs and not line_text:
-            line_text = "[图片]"
-        elif f_imgs:
-            line_text += " [附图片]"
-        if line_text:
-            lines.append(f"{s_name}: {line_text}")
-    return "【合并转发内容】:\n" + "\n".join(lines), forward_images
-

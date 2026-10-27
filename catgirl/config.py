@@ -39,7 +39,7 @@ ADMIN_QQ = os.getenv("ADMIN_QQ", "")
 ONEBOT_WS_URI = os.getenv("ONEBOT_WS_URI", "ws://127.0.0.1:3001")
 
 # 多模态会话配置
-MAX_IMAGES_PER_TURN = int(os.getenv("MAX_IMAGES_PER_TURN", "10"))
+MAX_IMAGES_PER_TURN = int(os.getenv("MAX_IMAGES_PER_TURN", "16"))
 MAX_HISTORY_TURNS = int(os.getenv("MAX_HISTORY_TURNS", "7"))
 SESSION_EXPIRE_SECONDS = int(os.getenv("SESSION_EXPIRE_SECONDS", "600"))
 GROUP_SESSION_MODE = os.getenv("GROUP_SESSION_MODE", "user")  # "user" 为单人隔离模式, "group" 为全群共享
