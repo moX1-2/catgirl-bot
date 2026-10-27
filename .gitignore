@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+*.b64
+*.tmp
+*.log
+.DS_Store
