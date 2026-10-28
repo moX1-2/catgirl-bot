@@ -19,9 +19,10 @@ from ..prompts import PROMPT_CATGIRL_BASE
 from ..clock import get_utc8_wall_clock
 from .client import get_llm_client
 from .history import get_session_history, append_to_history
-from ..tools.definitions import TAVILY_TOOL_DEFINITION, DRAW_SVG_TOOL_DEFINITION
+from ..tools.definitions import TAVILY_TOOL_DEFINITION, DRAW_SVG_TOOL_DEFINITION, SEND_VOICE_TOOL_DEFINITION
 from ..tools.tavily import perform_tavily_search
 from ..tools.svg import render_svg_to_png_base64
+from ..tools.tts import generate_speech_gemini
 from ..tools.image import fetch_image_as_base64
 
 async def ask_llm(
@@ -30,7 +31,7 @@ async def ask_llm(
     user_msg: str,
     image_urls: Optional[List[str]] = None,
     recent_context: Optional[str] = None
-) -> Tuple[str, Optional[str]]:
+) -> Tuple[str, Optional[str], Optional[str]]:
     """
     自主 Agent 决策与自反思主流程。
     返回: (reply_text, generated_svg_png_b64)
@@ -78,7 +79,7 @@ async def ask_llm(
             response = await client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=messages_to_send,
-                tools=[TAVILY_TOOL_DEFINITION, DRAW_SVG_TOOL_DEFINITION],
+                tools=[TAVILY_TOOL_DEFINITION, DRAW_SVG_TOOL_DEFINITION, SEND_VOICE_TOOL_DEFINITION],
                 tool_choice="auto",
                 max_tokens=700,
                 temperature=0.85,
@@ -103,6 +104,7 @@ async def ask_llm(
         current_msg = response.choices[0].message
 
         generated_svg_b64 = None
+        generated_voice_b64 = None
         reply = ""
 
         # 自主 Agent 多轮思考、工具调用与视觉重绘循环 (上限 10 轮，模型自主决定何时收敛)
@@ -131,6 +133,24 @@ async def ask_llm(
                         "tool_call_id": tc.id,
                         "content": search_res
                     })
+                elif fn_name == "send_voice":
+                    v_text = args.get("text", "")
+                    v_voice = args.get("voice", "Aoede")
+                    print(f"[*] 执行 Gemini 3.8 TTS 语音合成 (轮次 {step+1}): {v_text[:30]} ({v_voice})")
+                    v_b64, v_err = await generate_speech_gemini(v_text, voice_name=v_voice)
+                    if v_b64:
+                        generated_voice_b64 = v_b64
+                        messages_to_send.append({
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "content": f"语音已生成完毕并准备作为 QQ 语音气泡发送给用户喵！"
+                        })
+                    else:
+                        messages_to_send.append({
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "content": f"语音合成未成功: {v_err}"
+                        })
                 elif fn_name == "draw_svg":
                     svg_title = args.get("title", "示意图")
                     svg_code = args.get("svg_code", "")
@@ -208,10 +228,10 @@ async def ask_llm(
 
         append_to_history(session_key, f"{sender_name}: {user_history_text}", reply)
 
-        return reply, generated_svg_b64
+        return reply, generated_svg_b64, generated_voice_b64
 
     except Exception as e:
         print(f"[API 异常]: {type(e).__name__}: {e}")
         # 优雅降级：向用户输出友好萌系错误提示，绝不在聊天中失联
         fallback_reply = "喵呜... 思考的时候网络小海豚打了个盹，阿橘没能连上大脑喵！请主人稍后再呼唤我试一次吧🐾"
-        return fallback_reply, None
+        return fallback_reply, None, None

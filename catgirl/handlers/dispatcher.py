@@ -15,7 +15,7 @@ from ..config import (
     GROUP_CONTEXT_LIMIT,
     FISH_TRIGGER_PROBABILITY
 )
-from ..limiter import dm_limiter
+from ..limiter import dm_limiter, blacklist_manager
 from ..onebot.client import (
     ws_send,
     ensure_friend_list_cached,
@@ -37,6 +37,10 @@ async def process_message_event(ws, event: Dict[str, Any]):
     """处理 OneBot message 消息事件"""
     user_id = event.get("user_id")
     if str(user_id) == str(BOT_QQ):
+        return
+
+    # ---------- 黑名单拦截 (彻底防止 Bot 回声死循环与恶意刷屏) ----------
+    if blacklist_manager.is_blocked(str(user_id)):
         return
 
     msg_type = event.get("message_type")
@@ -211,7 +215,7 @@ async def process_message_event(ws, event: Dict[str, Any]):
         recent_ctx = ""
 
     print(f"[*] 正在生成回复: 来源={session_key}, 用户={sender}")
-    reply, gen_img = await ask_llm(session_key, sender, full_user_msg, image_urls, recent_ctx)
+    reply, gen_img, gen_voice = await ask_llm(session_key, sender, full_user_msg, image_urls, recent_ctx)
 
     if reply or gen_img:
         out_msg = []
@@ -233,11 +237,25 @@ async def process_message_event(ws, event: Dict[str, Any]):
             }
         await ws_send(ws, payload)
 
+    if gen_voice:
+        print(f"[+] 正在向 QQ 下发生成的 Despina 导演语音气泡 (Base64 大小: {len(gen_voice)})")
+        voice_payload = {
+            "action": "send_group_msg" if msg_type == "group" else "send_private_msg",
+            "params": {
+                ("group_id" if msg_type == "group" else "user_id"): (group_id if msg_type == "group" else user_id),
+                "message": [{"type": "record", "data": {"file": f"base64://{gen_voice}"}}]
+            }
+        }
+        await asyncio.sleep(0.3)
+        await ws_send(ws, voice_payload)
+
 async def process_notice_event(ws, event: Dict[str, Any]):
     """处理 OneBot notice 通知事件 (戳一戳/拍一拍)"""
     if event.get("sub_type") == "poke":
         target_id = event.get("target_id")
         user_id = event.get("user_id")
+        if blacklist_manager.is_blocked(str(user_id)):
+            return
         group_id = event.get("group_id")
         if str(target_id) == str(BOT_QQ) and str(user_id) != str(BOT_QQ):
             reactions = [

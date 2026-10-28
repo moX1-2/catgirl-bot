@@ -49,6 +49,10 @@ GROUP_CONTEXT_LIMIT = int(os.getenv("GROUP_CONTEXT_LIMIT", "20"))
 ENABLE_HEARTBEAT = os.getenv("ENABLE_HEARTBEAT", "true").lower() in ("true", "1", "yes")
 HEARTBEAT_INTERVAL = int(os.getenv("HEARTBEAT_INTERVAL", "300"))
 
+# Gemini 3.8 Flash TTS 语音合成密钥与音调系数
+GEMINI_TTS_KEY = os.getenv("GEMINI_TTS_KEY", "")
+TTS_PITCH_FACTOR = float(os.getenv("TTS_PITCH_FACTOR", "1.15"))  # 默认 1.15x 升调，达到最佳自然猫娘萌化效果
+
 # Tavily 搜索密钥池 (支持逗号分隔多个 Key 自动故障转移)
 _tavily_raw = os.getenv("TAVILY_KEYS", "")
 if _tavily_raw:

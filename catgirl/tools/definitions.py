@@ -42,3 +42,26 @@ TAVILY_TOOL_DEFINITION = {
         }
     }
 }
+
+SEND_VOICE_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": "send_voice",
+        "description": "用小橘萌萌的原声语音说话并发送语音条给用户。适用于：用户要求语音、发语音、听你说、撒娇、唱歌、念台词，或者你想用真实声音软萌互动的情境。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "要用语音说出的文本内容，建议 5~40 字以内，自然口语化，适合猫娘声线表达。"
+                },
+                "voice": {
+                    "type": "string",
+                    "enum": ["Aoede", "Kore", "Puck"],
+                    "description": "音色选择。Aoede: 活泼元气猫娘少女音(推荐默认); Kore: 温柔安静学姐音; Puck: 少年音。"
+                }
+            },
+            "required": ["text"]
+        }
+    }
+}

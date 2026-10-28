@@ -10,6 +10,13 @@
 
 ## ✨ 核心特性
 
+- 🎙️ **二次元自然连贯 TTS 语音与语音条下发 (Gemini 3.8 Flash TTS)**
+  - 采用 Google 官方推荐的 **Director 导演提示词** 与 **Despina 轻快少女音色**，语调自然、断句连贯，彻底消除机械断音。
+  - 内置多模型自动故障转移池 (`gemini-3.8-flash-lite-tts` -> `gemini-3.1-flash-tts-preview` -> `gemini-3.8-flash-tts`)，无惧每日配额耗尽。
+  - 支持智能体自主根据场景发语音，以及 `/tts <文本>` 或 `/语音 <文本>` 0-Token 瞬时直发。
+- 🚫 **持久化黑名单与防 Bot 回声死循环 (Echo & Spam Prevention)**
+  - 管理员专属特权指令：`/ban <QQ>`、`/unban <QQ>`、`/blacklist`。
+  - 被屏蔽的账号在消息入口处 0 消耗直接静默丢弃，彻底杜绝两个 Bot 互相引用触发对话风暴。
 - 🧠 **10 轮多模态自反思决策循环 (Self-Reflective Agent Loop)**
   - 模型自主调用工具并决策何时收敛，支持最多 10 轮连续推演。
   - **SVG 矢量绘制与 Linux 渲染**：利用 `rsvg-convert` 与 `cairosvg` 将生成的 SVG 光栅化为高清 PNG，并自动挂载文泉驿微米黑字体。

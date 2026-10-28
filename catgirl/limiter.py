@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-速率限制器模块
-包含 Tavily 搜索速率限制与陌生人私聊保护限制
+速率限制器与黑名单管理模块
+包含 Tavily 搜索速率限制、陌生人私聊保护限制以及防 Bot 回声/死循环的持久化黑名单
 """
 
+import os
+import json
 import time
 from collections import defaultdict, deque
+from typing import Set, List
 from .config import TAVILY_MAX_PER_MINUTE, TAVILY_MIN_INTERVAL, DM_LIMIT_PER_MINUTE
 
 class TavilySearchRateLimiter:
@@ -45,6 +48,57 @@ class DmRateLimiter:
         dq.append(now)
         return True, ""
 
+class BlacklistManager:
+    """持久化黑名单管理器，防止恶意刷屏与 Bot 间互相对话/回声死循环"""
+    def __init__(self, file_path=None):
+        if file_path is None:
+            file_path = os.getenv("BLACKLIST_FILE", os.path.join(os.path.dirname(__file__), "blacklist.json"))
+        self.file_path = file_path
+        self.blocked_users: Set[str] = set()
+        self.load()
+
+    def load(self):
+        if os.path.isfile(self.file_path):
+            try:
+                with open(self.file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        self.blocked_users = set(str(x).strip() for x in data if str(x).strip())
+            except Exception as e:
+                print(f"[-] 读取黑名单文件失败: {e}")
+
+    def save(self):
+        try:
+            with open(self.file_path, "w", encoding="utf-8") as f:
+                json.dump(sorted(list(self.blocked_users)), f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"[-] 保存黑名单文件失败: {e}")
+
+    def is_blocked(self, user_id: str) -> bool:
+        return str(user_id).strip() in self.blocked_users
+
+    def block(self, user_id: str) -> bool:
+        u = str(user_id).strip()
+        if not u:
+            return False
+        if u not in self.blocked_users:
+            self.blocked_users.add(u)
+            self.save()
+            return True
+        return False
+
+    def unblock(self, user_id: str) -> bool:
+        u = str(user_id).strip()
+        if u in self.blocked_users:
+            self.blocked_users.remove(u)
+            self.save()
+            return True
+        return False
+
+    def list_all(self) -> List[str]:
+        return sorted(list(self.blocked_users))
+
 # 模块单例
 search_limiter = TavilySearchRateLimiter()
 dm_limiter = DmRateLimiter()
+blacklist_manager = BlacklistManager()
