@@ -16,6 +16,12 @@ def get_session_history(session_key: str) -> List[Dict[str, Any]]:
     """获取指定会话的历史消息列表，自动进行 TTL 检查与更新"""
     now = time.time()
     if session_key not in chat_histories or (now - chat_histories[session_key]["last_time"] > SESSION_EXPIRE_SECONDS):
+        if session_key in chat_histories:
+            try:
+                from ..workspace import workspace_manager
+                workspace_manager.cleanup_workspace(session_key)
+            except Exception:
+                pass
         chat_histories[session_key] = {"last_time": now, "messages": []}
     else:
         chat_histories[session_key]["last_time"] = now
@@ -38,9 +44,14 @@ def append_to_history(session_key: str, user_entry: str, assistant_entry: str):
         chat_histories[session_key]["messages"] = msgs[-MAX_HISTORY_TURNS * 2:]
 
 def clear_session_history(session_key: str):
-    """清空指定会话的记忆"""
+    """清空指定会话的记忆，并全自动彻底释放其绑定的沙箱工作区与临时文件"""
     if session_key in chat_histories:
         chat_histories[session_key]["messages"] = []
+    try:
+        from ..workspace import workspace_manager
+        workspace_manager.cleanup_workspace(session_key)
+    except Exception:
+        pass
 
 def get_active_session_count() -> int:
     """返回当前未过期的活跃会话数"""

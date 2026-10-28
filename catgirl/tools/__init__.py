@@ -7,7 +7,11 @@ from .definitions import (
     TAVILY_TOOL_DEFINITION,
     DRAW_SVG_TOOL_DEFINITION,
     SEND_VOICE_TOOL_DEFINITION,
-    GENERATE_IMAGE_TOOL_DEFINITION
+    GENERATE_IMAGE_TOOL_DEFINITION,
+    WORKSPACE_RUN_TOOL_DEFINITION,
+    WORKSPACE_WRITE_TOOL_DEFINITION,
+    WORKSPACE_READ_TOOL_DEFINITION,
+    WORKSPACE_LIST_TOOL_DEFINITION
 )
 from .tavily import perform_tavily_search
 from .svg import render_svg_to_png_base64
@@ -24,5 +28,9 @@ __all__ = [
     "render_svg_to_png_base64",
     "fetch_image_as_base64",
     "generate_speech_gemini",
-    "generate_picture_gemini"
+    "generate_picture_gemini",
+    "WORKSPACE_RUN_TOOL_DEFINITION",
+    "WORKSPACE_WRITE_TOOL_DEFINITION",
+    "WORKSPACE_READ_TOOL_DEFINITION",
+    "WORKSPACE_LIST_TOOL_DEFINITION"
 ]

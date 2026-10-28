@@ -83,3 +83,73 @@ GENERATE_IMAGE_TOOL_DEFINITION = {
         }
     }
 }
+
+WORKSPACE_RUN_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": "workspace_run",
+        "description": "在会话专属的安全沙箱工作区中执行命令或运行脚本 (如运行 Python 数据计算、处理文本、批量清洗等)。禁止逃逸或破坏操作，自带超时强杀释放保护。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "要在沙箱工作区中执行的终端或解释器命令，例如 'python3 script.py' 或 'ls -la'"
+                }
+            },
+            "required": ["command"]
+        }
+    }
+}
+
+WORKSPACE_WRITE_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": "workspace_write",
+        "description": "在沙箱工作区中创建或覆盖写入文件。受严格单文件大小与沙箱路径防逃逸保护。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filename": {
+                    "type": "string",
+                    "description": "相对路径文件名，例如 'calc.py' 或 'data/test.json'"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "要写入的文件完整文本内容"
+                }
+            },
+            "required": ["filename", "content"]
+        }
+    }
+}
+
+WORKSPACE_READ_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": "workspace_read",
+        "description": "从沙箱工作区中读取文件文本内容。受防逃逸检查限制。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filename": {
+                    "type": "string",
+                    "description": "要读取的文件相对路径名"
+                }
+            },
+            "required": ["filename"]
+        }
+    }
+}
+
+WORKSPACE_LIST_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": "workspace_list",
+        "description": "列出当前沙箱工作区中的所有文件与目录清单及体积状态。",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+}

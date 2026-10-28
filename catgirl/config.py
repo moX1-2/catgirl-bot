@@ -66,6 +66,13 @@ if _tavily_raw:
 else:
     TAVILY_KEYS = []
 
+# 临时工作区与隔离沙箱配置 (安全路径防逃逸、配额防打爆、超时强杀、生命周期全自动释放)
+WORKSPACE_BASE_DIR = os.getenv("WORKSPACE_BASE_DIR", "/tmp/catgirl_workspaces")
+WORKSPACE_MAX_FILE_SIZE_MB = int(os.getenv("WORKSPACE_MAX_FILE_SIZE_MB", "5"))   # 单文件最大 5MB
+WORKSPACE_MAX_TOTAL_MB = int(os.getenv("WORKSPACE_MAX_TOTAL_MB", "30"))          # 单工作区总额 30MB
+WORKSPACE_CMD_TIMEOUT_SEC = float(os.getenv("WORKSPACE_CMD_TIMEOUT_SEC", "15.0")) # 命令执行超时 15秒
+WORKSPACE_TTL_SECONDS = int(os.getenv("WORKSPACE_TTL_SECONDS", "1800"))           # 闲置半小时自动彻底清理释放
+
 # 速率限制配置
 TAVILY_MAX_PER_MINUTE = int(os.getenv("TAVILY_MAX_PER_MINUTE", "10"))
 TAVILY_MIN_INTERVAL = float(os.getenv("TAVILY_MIN_INTERVAL", "1.0"))

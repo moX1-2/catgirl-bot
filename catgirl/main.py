@@ -14,6 +14,7 @@ from .config import (
 )
 from .onebot.client import ws_send, pending_requests
 from .handlers.dispatcher import process_message_event, process_notice_event
+from .workspace import workspace_manager
 
 async def ws_receiver(ws, event_queue: asyncio.Queue):
     """WebSocket 接收协程，将 OneBot 事件路由到工作队列"""
@@ -43,6 +44,16 @@ async def event_worker(ws, event_queue: asyncio.Queue):
             asyncio.create_task(process_notice_event(ws, event))
         event_queue.task_done()
 
+
+async def workspace_cleaner_worker():
+    """定时沙箱工作区垃圾回收与资源释放协程 (每10分钟自动扫描释放超期空间)"""
+    while True:
+        await asyncio.sleep(600)
+        try:
+            workspace_manager.cleanup_expired_workspaces()
+        except Exception as e:
+            print(f"[-] 垃圾回收异常: {e}")
+
 async def heartbeat_worker(ws):
     """定时保活协程"""
     while True:
@@ -67,7 +78,8 @@ async def main():
                 event_queue = asyncio.Queue()
                 receiver_task = asyncio.create_task(ws_receiver(ws, event_queue))
                 worker_task = asyncio.create_task(event_worker(ws, event_queue))
-                tasks_to_wait = [receiver_task, worker_task]
+                cleaner_task = asyncio.create_task(workspace_cleaner_worker())
+                tasks_to_wait = [receiver_task, worker_task, cleaner_task]
                 if ENABLE_HEARTBEAT:
                     tasks_to_wait.append(asyncio.create_task(heartbeat_worker(ws)))
                 await asyncio.wait(tasks_to_wait, return_when=asyncio.FIRST_COMPLETED)

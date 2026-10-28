@@ -23,12 +23,17 @@ from ..tools.definitions import (
     TAVILY_TOOL_DEFINITION,
     DRAW_SVG_TOOL_DEFINITION,
     GENERATE_IMAGE_TOOL_DEFINITION,
-    SEND_VOICE_TOOL_DEFINITION
+    SEND_VOICE_TOOL_DEFINITION,
+    WORKSPACE_RUN_TOOL_DEFINITION,
+    WORKSPACE_WRITE_TOOL_DEFINITION,
+    WORKSPACE_READ_TOOL_DEFINITION,
+    WORKSPACE_LIST_TOOL_DEFINITION
 )
 from ..tools.tavily import perform_tavily_search
 from ..tools.svg import render_svg_to_png_base64
 from ..tools.tts import generate_speech_gemini
 from ..tools.paint import generate_picture_gemini
+from ..workspace import workspace_manager
 from ..tools.image import fetch_image_as_base64
 
 async def ask_llm(
@@ -85,7 +90,7 @@ async def ask_llm(
             response = await client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=messages_to_send,
-                tools=[TAVILY_TOOL_DEFINITION, DRAW_SVG_TOOL_DEFINITION, GENERATE_IMAGE_TOOL_DEFINITION, SEND_VOICE_TOOL_DEFINITION],
+                tools=[TAVILY_TOOL_DEFINITION, DRAW_SVG_TOOL_DEFINITION, GENERATE_IMAGE_TOOL_DEFINITION, SEND_VOICE_TOOL_DEFINITION, WORKSPACE_RUN_TOOL_DEFINITION, WORKSPACE_WRITE_TOOL_DEFINITION, WORKSPACE_READ_TOOL_DEFINITION, WORKSPACE_LIST_TOOL_DEFINITION],
                 tool_choice="auto",
                 max_tokens=700,
                 temperature=0.85,
@@ -189,6 +194,28 @@ async def ask_llm(
                             "tool_call_id": tc.id,
                             "content": f"AI 绘画未能生成: {err_msg}。请向用户说明情况，或者自主转用 draw_svg 绘制矢量图说明。"
                         })
+                elif fn_name == "workspace_run":
+                    cmd = args.get("command", "")
+                    print(f"[*] 执行沙箱命令 (轮次 {step+1}): {cmd[:50]}")
+                    code_ret, out_str, err_str = workspace_manager.run_command(session_key, cmd)
+                    res_text = f"退出码: {code_ret}\n标准输出:\n{out_str or '(无输出)'}\n标准错误:\n{err_str or '(无错误)'}"
+                    messages_to_send.append({"role": "tool", "tool_call_id": tc.id, "content": res_text})
+                elif fn_name == "workspace_write":
+                    fname = args.get("filename", "")
+                    fcontent = args.get("content", "")
+                    print(f"[*] 写入沙箱文件 (轮次 {step+1}): {fname} ({len(fcontent)} 字符)")
+                    ok, msg_res = workspace_manager.write_file(session_key, fname, fcontent)
+                    messages_to_send.append({"role": "tool", "tool_call_id": tc.id, "content": msg_res})
+                elif fn_name == "workspace_read":
+                    fname = args.get("filename", "")
+                    print(f"[*] 读取沙箱文件 (轮次 {step+1}): {fname}")
+                    ok, msg_res = workspace_manager.read_file(session_key, fname)
+                    messages_to_send.append({"role": "tool", "tool_call_id": tc.id, "content": msg_res})
+                elif fn_name == "workspace_list":
+                    print(f"[*] 查看沙箱文件清单 (轮次 {step+1})")
+                    items = workspace_manager.list_files(session_key)
+                    res_content = json.dumps(items, ensure_ascii=False) if items else "沙箱工作区当前为空。"
+                    messages_to_send.append({"role": "tool", "tool_call_id": tc.id, "content": res_content})
                 elif fn_name == "draw_svg":
                     svg_title = args.get("title", "示意图")
                     svg_code = args.get("svg_code", "")
