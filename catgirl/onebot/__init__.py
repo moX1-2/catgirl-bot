@@ -14,6 +14,7 @@ from .parser import (
     QQ_FACE_MAP,
     decode_qq_face,
     extract_clean_text,
+    clean_markdown_for_qq,
     extract_text_from_segments,
     get_msg_content,
     get_forward_content
@@ -33,6 +34,7 @@ __all__ = [
     "QQ_FACE_MAP",
     "decode_qq_face",
     "extract_clean_text",
+    "clean_markdown_for_qq",
     "extract_text_from_segments",
     "get_msg_content",
     "get_forward_content",

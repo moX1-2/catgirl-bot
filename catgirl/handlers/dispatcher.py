@@ -27,6 +27,7 @@ from ..onebot.client import (
 )
 from ..onebot.parser import (
     decode_qq_face,
+    clean_markdown_for_qq,
     get_msg_content,
     get_forward_content
 )
@@ -222,7 +223,7 @@ async def process_message_event(ws, event: Dict[str, Any]):
     reply, gen_img, gen_voice = await ask_llm(session_key, sender, full_user_msg, image_urls, recent_ctx)
 
     if reply or gen_img:
-        clean_reply = "\n".join(line.strip() for line in reply.splitlines() if line.strip()) if reply else ""
+        clean_reply = clean_markdown_for_qq(reply) if reply else ""
         
         # 判定是否需要触发长回复折叠 (超过设定字符数或行数自动收起到合并转发一条聊天记录)
         is_long_reply = (
