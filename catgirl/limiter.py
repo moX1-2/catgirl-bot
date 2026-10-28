@@ -9,7 +9,7 @@ import json
 import time
 from collections import defaultdict, deque
 from typing import Set, List
-from .config import TAVILY_MAX_PER_MINUTE, TAVILY_MIN_INTERVAL, DM_LIMIT_PER_MINUTE
+from .config import TAVILY_MAX_PER_MINUTE, TAVILY_MIN_INTERVAL, DM_LIMIT_PER_MINUTE, IMAGE_GEN_MAX_PER_MINUTE
 
 class TavilySearchRateLimiter:
     """搜索速率限制器：1 分钟最多 10 次，且保证最小间隔"""
@@ -50,18 +50,19 @@ class DmRateLimiter:
 
 
 class ImageGenerationRateLimiter:
-    """绘画速率限制器：严格限制 1 分钟最多生成 1 张图片，防止额度打光"""
-    def __init__(self, min_interval=60.0):
-        self.min_interval = min_interval
-        self.last_generation_time = 0.0
+    """绘画速率限制器：滑动窗口限制 1 分钟最多生成 3 张图片，支持视觉自检重绘"""
+    def __init__(self, max_per_minute=IMAGE_GEN_MAX_PER_MINUTE):
+        self.max_per_minute = max_per_minute
+        self.timestamps = deque()
 
     def allow(self) -> tuple[bool, str]:
         now = time.time()
-        elapsed = now - self.last_generation_time
-        if elapsed < self.min_interval:
-            remaining = int(self.min_interval - elapsed)
-            return False, f"阿橘画画爪子要磨破啦喵（绘图生成功能严格限制 1 分钟 1 张），还需冷却 {remaining} 秒，可以先让阿橘画极速 SVG 矢量图喵！"
-        self.last_generation_time = now
+        while self.timestamps and self.timestamps[0] <= now - 60.0:
+            self.timestamps.popleft()
+        if len(self.timestamps) >= self.max_per_minute:
+            wait_sec = int(60.0 - (now - self.timestamps[0])) + 1
+            return False, f"阿橘画画爪子要冒烟啦喵（绘图生成限制 1 分钟最多 {self.max_per_minute} 张），还需冷却 {wait_sec} 秒，可以先让阿橘画极速 SVG 矢量图喵！"
+        self.timestamps.append(now)
         return True, ""
 
 class BlacklistManager:

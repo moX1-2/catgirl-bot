@@ -70,7 +70,7 @@ GENERATE_IMAGE_TOOL_DEFINITION = {
     "type": "function",
     "function": {
         "name": "generate_image",
-        "description": "【方案B：AI 绘画大模型 (gemini-3.1-flash-image)】调用专业绘图大模型绘制精美复杂图像。全面支持【参考图生图 (Image-to-Image)】与文生图。重要规范：当用户要求绘制某个具体角色、IP、现实物体或特定形象时，你必须先通过 tavily_search 搜索相关信息并提取抓取到的参考图片直链，传入 reference_image_url 参数交由生图模型精准参考！注意：受严格的 1 分钟 1 张频率保护。",
+        "description": "【方案B：AI 绘画大模型 (gemini-3.1-flash-image)】调用专业绘图大模型绘制精美复杂图像。全面支持【参考图生图 (Image-to-Image)】与文生图。重要规范：当用户要求绘制某个具体角色、IP、现实物体或特定形象时，你必须先通过 tavily_search 搜索相关信息并提取抓取到的参考图片直链，传入 reference_image_url 参数交由生图模型精准参考！注意：受 1 分钟最多 3 张的滑动窗口频率保护。",
         "parameters": {
             "type": "object",
             "properties": {
