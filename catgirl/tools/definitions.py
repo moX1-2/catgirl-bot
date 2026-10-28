@@ -76,7 +76,7 @@ GENERATE_IMAGE_TOOL_DEFINITION = {
             "properties": {
                 "prompt": {
                     "type": "string",
-                    "description": "详细生动的画面描述提示词（包含构图、场景、光影、动态姿势与风格）"
+                    "description": "生动的画面提示词。重要：严禁生成呆板站桩立正！必须包含生动具体的动态姿势（如向前伸手邀请、空中飞舞旋转、微侧身回眸、抚发wink、帅气战斗起手式、慵懒倚坐等）、戏剧性镜头视角（微仰角/微俯角/近景景深）与环境光影细节！"
                 },
                 "reference_image_url": {
                     "type": "string",
