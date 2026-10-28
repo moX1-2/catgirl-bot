@@ -53,6 +53,68 @@ def extract_clean_text(raw_msg, raw_str=""):
     return text
 
 
+
+def clean_markdown_for_qq(text: str) -> str:
+    """
+    将大模型生成的 Markdown 文本清洗转换为优雅、易读的 QQ 原生纯文本
+    1. 剥离残留的裸 SVG XML 代码
+    2. 转换 Markdown 超链接 [名称](URL) -> 名称 (URL)
+    3. 转换代码块为清晰的纯文本分割线
+    4. 转换行内代码 `code` 为 「code」
+    5. 转换 **加粗** 与 __加粗__ 为 【重点】
+    6. 转换 # 标题 为 【标题】
+    7. 转换列表符号 (*, -, +) 为圆点 ·
+    8. 规范过长的空白换行
+    """
+    if not text:
+        return ""
+
+    s = text.strip()
+
+    # 1. 剥离残留 SVG
+    s = re.sub(r"```(?:xml|svg)?\s*<svg[\s\S]*?</svg>\s*```", "", s, flags=re.I)
+    s = re.sub(r"<svg[\s\S]*?</svg>", "", s, flags=re.I)
+
+    # 2. Markdown 超链接: [说明](url) -> 说明 (url)
+    s = re.sub(r"\[([^\]]+)\]\((https?://[^\)]+)\)", r"\1 (\2)", s)
+
+    # 3. 多行代码块: ```lang ... ```
+    def _code_block_sub(m):
+        code_body = m.group(1).strip()
+        return f"\n----- [代码片段] -----\n{code_body}\n--------------------\n"
+    s = re.sub(r"```[a-zA-Z0-9_-]*\n([\s\S]*?)\n```", _code_block_sub, s)
+    s = re.sub(r"```([\s\S]*?)```", _code_block_sub, s)
+
+    # 4. 行内代码: `code` -> 「code」
+    s = re.sub(r"`([^`\n]+)`", r"「\1」", s)
+
+    # 5. 加粗与斜体:
+    # ***加粗斜体*** -> 【内容】
+    s = re.sub(r"\*\*\*([^*\n]+)\*\*\*", r"【\1】", s)
+    # **加粗** -> 【内容】
+    s = re.sub(r"\*\*([^*\n]+)\*\*", r"【\1】", s)
+    # __加粗__ -> 【内容】
+    s = re.sub(r"__([^_\n]+)__", r"【\1】", s)
+    # *斜体* -> 内容 (剥离孤立单星号)
+    s = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"\1", s)
+
+    # 6. 各级标题: # 标题 -> 【标题】
+    s = re.sub(r"^#{1,6}\s*(.+)$", r"【\1】", s, flags=re.M)
+
+    # 7. 无序列表: *, -, + -> · 
+    s = re.sub(r"^[\*\-\+]\s+", r"· ", s, flags=re.M)
+
+    # 8. 引用块: > 引用 -> | 引用
+    s = re.sub(r"^>\s*(.+)$", r"| \1", s, flags=re.M)
+
+    # 9. 分割线: --- 或 *** -> --------------------
+    s = re.sub(r"^[ \t]*[-*_]{3,}[ \t]*$", r"--------------------", s, flags=re.M)
+
+    # 10. 压缩 3 个以上的连续换行
+    s = re.sub(r"\n{3,}", "\n\n", s)
+
+    return s.strip()
+
 def extract_text_from_segments(segments):
     lines = []
     for s in segments:
