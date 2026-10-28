@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Gemini 3.1 Flash Image AI 绘图生成模块
-支持利用 gemini-3.1-flash-image 绘制复杂高质量插画、二次元、写实场景与艺术图
-内置 1 分钟 3 张的滑动窗口频率保护、随机动态姿势库与场景氛围增强 (彻底消除单调站桩)
+支持利用 gemini-3.1-flash-image 绘制高质量插画、二次元、写实场景与艺术图
+内置 1 分钟 3 张滑动窗口保护、多主题分类动态姿势与电影级构图场景扩充库
 """
 
 import re
@@ -15,56 +15,107 @@ import httpx
 from ..config import API_KEY, BASE_URL, IMAGE_GEN_MODEL
 from ..limiter import image_limiter
 
-# 动态姿势库 (当未指定具体姿势时智能随机抽选，赋予角色生命力与故事感)
-DYNAMIC_POSES = [
-    "leaning forward slightly with one hand reaching out toward viewer with open palm, gentle head tilt, dynamic foreshortening, intimate connection",
-    "turning back to look over shoulder with a radiant cheerful smile, mid-motion running turn, hair and skirt fluttering dynamically in the wind",
-    "floating weightlessly in mid-air in zero gravity, legs slightly curved, floating ribbons and hair strands, dreamy ethereal composition",
-    "sitting comfortably on a scenic stone ledge or balustrade, dangling legs with one knee raised, relaxed natural posture, tilting head upward to the sky",
-    "playful cute gesture with one hand making a soft cat paw or gentle peace sign near cheek, slight playful wink, expressive radiant face",
-    "dynamic combat action stance with glowing energy particles swirling around hands, dramatic low angle shot, hair billowing with motion blur",
-    "holding a delicious sweet treat or drink with both hands, taking a tiny cute bite with softly blushing cheeks, charming candid moment",
-    "gently holding a parasol or glowing star lantern, lightly lifting dress hem with one hand while turning, petal-strewn breeze",
-    "resting chin in hand while gazing thoughtfully into the distance, soft breeze parting hair, cinematic depth of field"
-]
+# ================== 多维度生动姿势分类库 (Danbooru & Illustrious 级动作提炼) ==================
+THEMATIC_POSES = {
+    # 1. 软萌日常与亲昵互动 (Cute & Casual)
+    "cute_casual": [
+        "leaning forward playfully with one hand reaching out toward viewer with open palm, gentle head tilt, dynamic foreshortening, intimate connection",
+        "sitting comfortably on a scenic balustrade or stone ledge, dangling legs with one knee raised, relaxed natural posture, tilting head upward to the sky",
+        "playful cute gesture with one hand making a soft cat paw or gentle peace sign near cheek, slight playful wink, expressive radiant face",
+        "holding a small delicious pastry or sweet drink with both hands, taking a tiny cute bite with softly blushing cheeks, charming candid moment",
+        "gentle morning stretch with arms raised overhead, arching back slightly, soft warm smile, casual cozy atmosphere",
+        "resting chin in hands while leaning across a wooden tabletop, looking up with curious twinkling eyes and soft smile",
+        "holding a fluffy cat or mascot plushie close to chest, nuzzling face into it with a sweet contented grin",
+        "tucking a soft stray strand of hair behind ear, looking directly into camera with shy blushing smile, intimate framing"
+    ],
+    # 2. 高燃战斗与疾走动感 (Dynamic & Action)
+    "dynamic_action": [
+        "dynamic combat action stance with glowing energy particles swirling around hands, dramatic low angle shot, hair billowing with motion blur",
+        "turning back mid-motion to look over shoulder with a radiant determined expression, running turn, dynamic hair and skirt fluttering in the wind",
+        "drawing sword from scabbard with crisp diagonal motion, blade catching a brilliant gleam of light, sharp focused gaze",
+        "mid-air acrobatic leap, one leg extended and ribbons spiraling outward, dynamic diagonal camera framing",
+        "landing from a jump with one hand touching the ground, shockwave energy ripples expanding beneath feet, dramatic foreshortening",
+        "casting an intricate glowing magic circle in front of hands, concentrated magic glow illuminating face in sharp contrast",
+        "holding weapons ready at side, turning sharply with motion blur, fierce intense eyes, dynamic perspective"
+    ],
+    # 3. 唯美意境与轻盈空灵 (Dreamy & Ethereal)
+    "dreamy_poetic": [
+        "floating weightlessly in mid-air in zero gravity, legs slightly curved in elegant flow, floating ribbons and hair strands, ethereal dreamscape",
+        "gently holding a glowing star lantern, lightly lifting dress hem with one hand while turning along a petal-strewn path",
+        "leaning against a rustic balcony railing at dusk, breeze gently parting hair, thoughtful melancholic yet warm gaze toward horizon",
+        "walking slowly barefoot along the water's edge, dress gently skimming reflective shallow water, glowing ripples expanding outward",
+        "holding hands close to heart with fingers intertwined, eyes gently closed in quiet wish or prayer, serene glowing particles",
+        "peeking around a doorway or flowering tree trunk with a playful curious expression, whimsical candid framing"
+    ]
+}
 
 # 镜头构图与透视视角库
 CAMERA_PERSPECTIVES = [
-    "cinematic low angle perspective with dynamic diagonal framing",
-    "slight high angle looking down with dramatic depth of field and soft bokeh",
+    "cinematic low angle perspective with dynamic diagonal framing and sense of scale",
+    "slight high angle looking down with dramatic depth of field and soft circular bokeh",
     "dutch angle dynamic composition with foreground light elements",
-    "cinematic wide three-quarter view with foreground bokeh and rim light",
-    "intimate close-up portrait with cinematic depth of field and glowing eye reflections"
+    "cinematic wide three-quarter view with foreground light leaks and rim light",
+    "intimate close-up portrait with shallow depth of field and glowing eye reflections",
+    "wide environmental shot balancing the character silhouette with breathtaking panoramic scenery"
 ]
 
-# 电影级场景氛围库 (当未指定背景时智能随机融入)
-ATMOSPHERIC_SCENES = [
-    "surrounded by glowing bioluminescent fireflies and floating golden light orbs under a starry cosmic night sky",
-    "golden hour sunset on a high scenic rooftop with soft warm backlight, city skyline glowing in distant haze",
-    "magical dreamscape with floating clockwork gears, translucent pastel bubbles, and starlight reflections",
-    "lush flowering garden under dappled sunlight, blooming cherry blossom petals dancing in the air",
-    "vibrant neon-lit festival night with bokeh lanterns and romantic evening breeze",
-    "serene lakeside at dawn, morning mist rising with glowing water reflections and floating crystal fragments"
-]
+# 电影级场景氛围库
+ATMOSPHERIC_SCENES = {
+    "cosmic_fantasy": [
+        "surrounded by glowing bioluminescent fireflies and floating golden light orbs under a starry cosmic night sky and nebula aurora",
+        "magical dreamscape with floating clockwork gears, translucent pastel bubbles, and celestial starlight reflections",
+        "vast crystal palace ruins floating among shattered asteroids, iridescent auroral curtains shimmering in space",
+        "enchanted field of luminescent blue and white spider lilies blooming under a gigantic luminous crescent moon"
+    ],
+    "anime_daily": [
+        "golden hour sunset on a high scenic rooftop with soft warm backlight, city skyline glowing in distant haze and fluffy cumulonimbus clouds",
+        "tranquil cherry blossom stone staircase under dappled sunlight, pastel pink petals dancing gracefully in the spring breeze",
+        "quaint retro sunlit cafe patio with trailing ivy, morning light filtering through wooden pergolas and casting delicate patterns",
+        "seaside train station platform under clear azure summer sky, ocean waves glistening in distance with fresh coastal breeze"
+    ],
+    "cyber_festival": [
+        "vibrant neon-lit festival night with floating paper lanterns, glowing bokeh lights, and romantic evening breeze",
+        "futuristic cyberpunk street bathed in magenta and cyan neon glow, reflections shimmering in rain-slicked asphalt puddles",
+        "bustling festival night market with stalls and hanging festival banners, golden sparks drifting from distant fireworks"
+    ]
+}
 
 def enrich_prompt_with_dynamics(clean_prompt: str) -> str:
     """
     根据用户输入智能判断：
-    - 若用户已明确指定动作或场景，严格保留并仅补充镜头与光影；
-    - 若输入较为简单（如仅角色名），自动融入生动的动态姿势与电影级场景氛围，彻底拒绝死板证件照！
+    - 若用户已明确指定动作或场景，严格保留并仅补充镜头视角与光影；
+    - 若未具体指定动作，按语义智能匹配（战斗/软萌/唯美/日常）抽选生动的姿势与镜头！
     """
+    p_lower = clean_prompt.lower()
+
     pose_keywords = ["坐", "躺", "跑", "战", "飞", "吃", "拿", "看", "笑", "站", "握", "跃", "挥", "pose", "stand", "sit", "run", "jump", "eating", "fighting"]
     scene_keywords = ["在", "背景", "天台", "海", "夜", "星", "森林", "花", "街", "房", "学", "城", "水", "空", "background", "scene", "night", "sky", "room"]
 
-    has_custom_pose = any(w in clean_prompt for w in pose_keywords)
-    has_custom_scene = any(w in clean_prompt for w in scene_keywords)
+    has_custom_pose = any(w in p_lower for w in pose_keywords)
+    has_custom_scene = any(w in p_lower for w in scene_keywords)
 
     modifiers = []
+
+    # 1. 姿势补充
     if not has_custom_pose:
-        modifiers.append(random.choice(DYNAMIC_POSES))
+        has_action = any(w in p_lower for w in ["战", "打", "剑", "刀", "魔", "机甲", "fight", "battle", "sword", "weapon", "action"])
+        has_dreamy = any(w in p_lower for w in ["星", "梦", "海", "空", "月", "花", "dream", "star", "space", "moon", "flower"])
+        
+        if has_action:
+            chosen_pose = random.choice(THEMATIC_POSES["dynamic_action"])
+        elif has_dreamy:
+            chosen_pose = random.choice(THEMATIC_POSES["dreamy_poetic"])
+        else:
+            chosen_pose = random.choice(THEMATIC_POSES["cute_casual"])
+        modifiers.append(chosen_pose)
+
+    # 2. 镜头视角补充
     modifiers.append(random.choice(CAMERA_PERSPECTIVES))
+
+    # 3. 场景氛围补充
     if not has_custom_scene:
-        modifiers.append(random.choice(ATMOSPHERIC_SCENES))
+        all_scenes = sum(ATMOSPHERIC_SCENES.values(), [])
+        modifiers.append(random.choice(all_scenes))
 
     extra_str = ", ".join(modifiers)
     return f"{clean_prompt}. Dynamic artistic composition: {extra_str}"
