@@ -7,7 +7,7 @@ DRAW_SVG_TOOL_DEFINITION = {
     "type": "function",
     "function": {
         "name": "draw_svg",
-        "description": "绘制清晰简洁的 SVG 矢量图并自动渲染为高清 PNG 图片发到聊天中。适用于绘制：系统架构图、流程逻辑图、技术对比卡片、数据示意图或猫猫插图。当用户要求画图、示意图、流程图或绘制图解时调用此工具。",
+        "description": "【方案A：SVG 矢量制图 (无频率限制/速度秒级)】绘制结构清晰的矢量图并自动光栅化为高清图片。最适用于：系统架构图、流程逻辑图、技术对比卡片、数据示意图、UI排版框架或简笔线条猫猫涂鸦。优势：秒级生成、中文字体排版精准、无生成频率限制。当内容偏向逻辑、排版、图表、卡片时优先选择此工具。",
         "parameters": {
             "type": "object",
             "properties": {
@@ -62,6 +62,24 @@ SEND_VOICE_TOOL_DEFINITION = {
                 }
             },
             "required": ["text"]
+        }
+    }
+}
+
+GENERATE_IMAGE_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": "generate_image",
+        "description": "【方案B：AI 绘画大模型 (gemini-3.1-flash-image)】调用专业绘图大模型绘制精美复杂图像。最适用于：二次元插画、写实场景、艺术画作、精美壁纸、逼真萌宠或复杂人物角色绘制。注意：该工具受到严格的 1 分钟 1 张频率保护，耗时约 30~50 秒。当用户需要精美插画、绘画或写实艺术作品时选用此工具。你可以自主在 draw_svg (排版/图表/架构/简笔) 与 generate_image (精美插画/写实艺术) 之间权衡决策！",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "详细生动的英文或中文画面描述提示词（建议包含画面主体、艺术风格、光影色彩、构图细节）"
+                }
+            },
+            "required": ["prompt"]
         }
     }
 }

@@ -48,6 +48,22 @@ class DmRateLimiter:
         dq.append(now)
         return True, ""
 
+
+class ImageGenerationRateLimiter:
+    """绘画速率限制器：严格限制 1 分钟最多生成 1 张图片，防止额度打光"""
+    def __init__(self, min_interval=60.0):
+        self.min_interval = min_interval
+        self.last_generation_time = 0.0
+
+    def allow(self) -> tuple[bool, str]:
+        now = time.time()
+        elapsed = now - self.last_generation_time
+        if elapsed < self.min_interval:
+            remaining = int(self.min_interval - elapsed)
+            return False, f"阿橘画画爪子要磨破啦喵（绘图生成功能严格限制 1 分钟 1 张），还需冷却 {remaining} 秒，可以先让阿橘画极速 SVG 矢量图喵！"
+        self.last_generation_time = now
+        return True, ""
+
 class BlacklistManager:
     """持久化黑名单管理器，防止恶意刷屏与 Bot 间互相对话/回声死循环"""
     def __init__(self, file_path=None):
@@ -102,3 +118,4 @@ class BlacklistManager:
 search_limiter = TavilySearchRateLimiter()
 dm_limiter = DmRateLimiter()
 blacklist_manager = BlacklistManager()
+image_limiter = ImageGenerationRateLimiter()

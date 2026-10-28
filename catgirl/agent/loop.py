@@ -19,10 +19,16 @@ from ..prompts import PROMPT_CATGIRL_BASE
 from ..clock import get_utc8_wall_clock
 from .client import get_llm_client
 from .history import get_session_history, append_to_history
-from ..tools.definitions import TAVILY_TOOL_DEFINITION, DRAW_SVG_TOOL_DEFINITION, SEND_VOICE_TOOL_DEFINITION
+from ..tools.definitions import (
+    TAVILY_TOOL_DEFINITION,
+    DRAW_SVG_TOOL_DEFINITION,
+    GENERATE_IMAGE_TOOL_DEFINITION,
+    SEND_VOICE_TOOL_DEFINITION
+)
 from ..tools.tavily import perform_tavily_search
 from ..tools.svg import render_svg_to_png_base64
 from ..tools.tts import generate_speech_gemini
+from ..tools.paint import generate_picture_gemini
 from ..tools.image import fetch_image_as_base64
 
 async def ask_llm(
@@ -79,7 +85,7 @@ async def ask_llm(
             response = await client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=messages_to_send,
-                tools=[TAVILY_TOOL_DEFINITION, DRAW_SVG_TOOL_DEFINITION, SEND_VOICE_TOOL_DEFINITION],
+                tools=[TAVILY_TOOL_DEFINITION, DRAW_SVG_TOOL_DEFINITION, GENERATE_IMAGE_TOOL_DEFINITION, SEND_VOICE_TOOL_DEFINITION],
                 tool_choice="auto",
                 max_tokens=700,
                 temperature=0.85,
@@ -135,7 +141,7 @@ async def ask_llm(
                     })
                 elif fn_name == "send_voice":
                     v_text = args.get("text", "")
-                    v_voice = args.get("voice", "Aoede")
+                    v_voice = args.get("voice", "Despina")
                     print(f"[*] 执行 Gemini 3.8 TTS 语音合成 (轮次 {step+1}): {v_text[:30]} ({v_voice})")
                     v_b64, v_err = await generate_speech_gemini(v_text, voice_name=v_voice)
                     if v_b64:
@@ -150,6 +156,38 @@ async def ask_llm(
                             "role": "tool",
                             "tool_call_id": tc.id,
                             "content": f"语音合成未成功: {v_err}"
+                        })
+                elif fn_name == "generate_image":
+                    p_prompt = args.get("prompt", "")
+                    print(f"[*] 执行 AI 绘画大模型 (gemini-3.1-flash-image) (轮次 {step+1}): {p_prompt[:40]}")
+                    b64_img, err_msg = await generate_picture_gemini(p_prompt)
+                    if b64_img:
+                        generated_svg_b64 = b64_img
+                        messages_to_send.append({
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "content": "AI 绘画已成功生成！"
+                        })
+                        # 视觉回显反馈：将 AI 生成的图像直接喂给模型眼睛
+                        messages_to_send.append({
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "【视觉回显自检】这是刚才为你生成的 AI 画面。如果你觉得满意，请直接向用户进行最终的图画赏析与说明；若有不满意且在额度内可微调。"
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}
+                                }
+                            ]
+                        })
+                    else:
+                        print(f"[-] AI 绘图未能生成: {err_msg}")
+                        messages_to_send.append({
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "content": f"AI 绘画未能生成: {err_msg}。请向用户说明情况，或者自主转用 draw_svg 绘制矢量图说明。"
                         })
                 elif fn_name == "draw_svg":
                     svg_title = args.get("title", "示意图")
