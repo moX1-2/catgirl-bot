@@ -13,11 +13,15 @@ from ..config import (
     BOT_QQ,
     GROUP_SESSION_MODE,
     GROUP_CONTEXT_LIMIT,
-    FISH_TRIGGER_PROBABILITY
+    FISH_TRIGGER_PROBABILITY,
+    FORWARD_FOLD_ENABLED,
+    FORWARD_FOLD_THRESHOLD,
+    FORWARD_FOLD_LINES
 )
 from ..limiter import dm_limiter, blacklist_manager
 from ..onebot.client import (
     ws_send,
+    call_api,
     ensure_friend_list_cached,
     cached_friend_ids
 )
@@ -218,24 +222,79 @@ async def process_message_event(ws, event: Dict[str, Any]):
     reply, gen_img, gen_voice = await ask_llm(session_key, sender, full_user_msg, image_urls, recent_ctx)
 
     if reply or gen_img:
-        out_msg = []
-        if reply:
-            clean_reply = "\n".join(line.strip() for line in reply.splitlines() if line.strip())
-            out_msg.append({"type": "text", "data": {"text": clean_reply}})
-        if gen_img:
-            print(f"[+] 正在向 QQ 下发生成的 SVG 渲染图片 (Base64 大小: {len(gen_img)})")
-            out_msg.append({"type": "image", "data": {"file": f"base64://{gen_img}"}})
-        if msg_type == "group":
-            payload = {
-                "action": "send_group_msg",
-                "params": {"group_id": group_id, "message": out_msg}
+        clean_reply = "\n".join(line.strip() for line in reply.splitlines() if line.strip()) if reply else ""
+        
+        # 判定是否需要触发长回复折叠 (超过设定字符数或行数自动收起到合并转发一条聊天记录)
+        is_long_reply = (
+            FORWARD_FOLD_ENABLED and clean_reply and
+            (len(clean_reply) >= FORWARD_FOLD_THRESHOLD or len(clean_reply.splitlines()) >= FORWARD_FOLD_LINES)
+        )
+
+        sent_via_forward = False
+        if is_long_reply:
+            print(f"[*] 检测到长文本回复 (长度: {len(clean_reply)} 字, {len(clean_reply.splitlines())} 行)，自动折叠打包为合并转发...")
+            # 1. 先发送简短引用提示
+            prompt_msg = []
+            orig_msg_id = event.get("message_id")
+            if orig_msg_id:
+                prompt_msg.append({"type": "reply", "data": {"id": str(orig_msg_id)}})
+            prompt_msg.append({"type": "text", "data": {"text": "内容放在下面的聊天记录里啦~ 🐾"}})
+            
+            prompt_payload = {
+                "action": "send_group_msg" if msg_type == "group" else "send_private_msg",
+                "params": {
+                    ("group_id" if msg_type == "group" else "user_id"): (group_id if msg_type == "group" else user_id),
+                    "message": prompt_msg
+                }
             }
-        else:
-            payload = {
-                "action": "send_private_msg",
-                "params": {"user_id": user_id, "message": out_msg}
+            await ws_send(ws, prompt_payload)
+
+            # 2. 发送合并转发卡片节点
+            node_content = [{"type": "text", "data": {"text": clean_reply}}]
+            if gen_img:
+                print(f"[+] 正在将生成的 SVG 渲染图片放入合并转发 (Base64 大小: {len(gen_img)})")
+                node_content.append({"type": "image", "data": {"file": f"base64://{gen_img}"}})
+
+            forward_nodes = [
+                {
+                    "type": "node",
+                    "data": {
+                        "name": "小橘",
+                        "uin": str(BOT_QQ),
+                        "content": node_content
+                    }
+                }
+            ]
+            fwd_action = "send_group_forward_msg" if msg_type == "group" else "send_private_forward_msg"
+            fwd_params = {
+                ("group_id" if msg_type == "group" else "user_id"): (group_id if msg_type == "group" else user_id),
+                "messages": forward_nodes
             }
-        await ws_send(ws, payload)
+            fwd_resp = await call_api(ws, fwd_action, fwd_params, timeout=6.0)
+            if fwd_resp and fwd_resp.get("status") == "ok":
+                sent_via_forward = True
+                print(f"[+] 合并转发长回复下发成功！")
+            else:
+                print(f"[-] 合并转发接口未返回成功，回退直接消息发送")
+
+        if not sent_via_forward:
+            out_msg = []
+            if clean_reply:
+                out_msg.append({"type": "text", "data": {"text": clean_reply}})
+            if gen_img:
+                print(f"[+] 正在向 QQ 下发生成的 SVG 渲染图片 (Base64 大小: {len(gen_img)})")
+                out_msg.append({"type": "image", "data": {"file": f"base64://{gen_img}"}})
+            if msg_type == "group":
+                payload = {
+                    "action": "send_group_msg",
+                    "params": {"group_id": group_id, "message": out_msg}
+                }
+            else:
+                payload = {
+                    "action": "send_private_msg",
+                    "params": {"user_id": user_id, "message": out_msg}
+                }
+            await ws_send(ws, payload)
 
     if gen_voice:
         print(f"[+] 正在向 QQ 下发生成的 Despina 导演语音气泡 (Base64 大小: {len(gen_voice)})")

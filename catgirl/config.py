@@ -49,6 +49,11 @@ GROUP_CONTEXT_LIMIT = int(os.getenv("GROUP_CONTEXT_LIMIT", "20"))
 ENABLE_HEARTBEAT = os.getenv("ENABLE_HEARTBEAT", "true").lower() in ("true", "1", "yes")
 HEARTBEAT_INTERVAL = int(os.getenv("HEARTBEAT_INTERVAL", "300"))
 
+# 长回复折叠配置 (文本过长时自动打包为一条合并转发聊天记录，保持群聊整洁)
+FORWARD_FOLD_ENABLED = os.getenv("FORWARD_FOLD_ENABLED", "true").lower() in ("true", "1", "yes")
+FORWARD_FOLD_THRESHOLD = int(os.getenv("FORWARD_FOLD_THRESHOLD", "260"))  # 超过260字自动收起
+FORWARD_FOLD_LINES = int(os.getenv("FORWARD_FOLD_LINES", "6"))           # 超过6行自动收起
+
 # Gemini 3.8 Flash TTS 语音合成密钥与音调系数
 GEMINI_TTS_KEY = os.getenv("GEMINI_TTS_KEY", "")
 TTS_PITCH_FACTOR = float(os.getenv("TTS_PITCH_FACTOR", "1.15"))  # 默认 1.15x 升调，达到最佳自然猫娘萌化效果
