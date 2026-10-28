@@ -70,13 +70,17 @@ GENERATE_IMAGE_TOOL_DEFINITION = {
     "type": "function",
     "function": {
         "name": "generate_image",
-        "description": "【方案B：AI 绘画大模型 (gemini-3.1-flash-image)】调用专业绘图大模型绘制精美复杂图像。最适用于：二次元插画、写实场景、艺术画作、精美壁纸、逼真萌宠或复杂人物角色绘制。注意：该工具受到严格的 1 分钟 1 张频率保护，耗时约 30~50 秒。当用户需要精美插画、绘画或写实艺术作品时选用此工具。你可以自主在 draw_svg (排版/图表/架构/简笔) 与 generate_image (精美插画/写实艺术) 之间权衡决策！",
+        "description": "【方案B：AI 绘画大模型 (gemini-3.1-flash-image)】调用专业绘图大模型绘制精美复杂图像。全面支持【参考图生图 (Image-to-Image)】与文生图。重要规范：当用户要求绘制某个具体角色、IP、现实物体或特定形象时，你必须先通过 tavily_search 搜索相关信息并提取抓取到的参考图片直链，传入 reference_image_url 参数交由生图模型精准参考！注意：受严格的 1 分钟 1 张频率保护。",
         "parameters": {
             "type": "object",
             "properties": {
                 "prompt": {
                     "type": "string",
-                    "description": "详细生动的英文或中文画面描述提示词（建议包含画面主体、艺术风格、光影色彩、构图细节）"
+                    "description": "详细生动的画面描述提示词（包含构图、场景、光影、动态姿势与风格）"
+                },
+                "reference_image_url": {
+                    "type": "string",
+                    "description": "官方或网络参考图片的 HTTP/HTTPS 直链（从 tavily_search 结果或群聊上下文获取，模型将精准对齐参考图的外观特征）"
                 }
             },
             "required": ["prompt"]
@@ -150,6 +154,24 @@ WORKSPACE_LIST_TOOL_DEFINITION = {
         "parameters": {
             "type": "object",
             "properties": {}
+        }
+    }
+}
+
+FETCH_WEB_PAGE_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": "fetch_web_page",
+        "description": "访问并深度抓取指定网页的完整正文内容。当 tavily_search 检索到的摘要不够详尽，或者需要深入阅读某个搜索结果链接的具体技术细节、博客文章、完整设定、GitHub文档或长文报道时调用此工具。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "要抓取阅读的目标网页完整 HTTP/HTTPS 链接"
+                }
+            },
+            "required": ["url"]
         }
     }
 }

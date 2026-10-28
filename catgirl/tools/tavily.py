@@ -31,7 +31,8 @@ async def perform_tavily_search(query: str, max_results: int = 4) -> str:
                 "query": clean_q,
                 "max_results": max_results,
                 "search_depth": "basic",
-                "include_answer": True
+                "include_answer": True,
+                "include_images": True
             }
             async with httpx.AsyncClient(timeout=15.0) as http_client:
                 resp = await http_client.post("https://api.tavily.com/search", json=payload)
@@ -47,6 +48,13 @@ async def perform_tavily_search(query: str, max_results: int = 4) -> str:
                         url = r.get("url", "")
                         snippet = r.get("content", "")[:180].strip()
                         lines.append(f"[{i}] {title}\n    链接: {url}\n    摘要: {snippet}")
+                    
+                    # 提取参考图片直链 (供 generate_image 作为参考图精准绘图)
+                    images = data.get("images", [])
+                    if images:
+                        lines.append("\n【抓取到的官方/网络参考图片 (可传给 generate_image 作为 reference_image_url 进行图生图精准绘制)】:")
+                        for img_idx, img_u in enumerate(images[:3], 1):
+                            lines.append(f"  · 参考图{img_idx}: {img_u}")
                     return "\n".join(lines)
                 else:
                     print(f"[-] Tavily key {idx+1} 返回状态码 {resp.status_code}")

@@ -16,10 +16,12 @@ from ..limiter import image_limiter
 
 async def generate_picture_gemini(
     prompt: str,
-    timeout: float = 75.0
+    reference_image_url: Optional[str] = None,
+    timeout: float = 95.0
 ) -> Tuple[Optional[str], str]:
     """
     调用 gemini-3.1-flash-image 生成高质量图像 Base64
+    全面支持文生图与【参考图生图 (Image-to-Image)】
     受到 1 分钟 1 次的严格频率限制
     返回: (base64_image_data, error_message)
     """
@@ -32,7 +34,23 @@ async def generate_picture_gemini(
     if not allowed:
         return None, f"[绘图限频保护] {reason}"
 
-    # 2. 调用 API 生成图像
+    # 2. 组装多模态提示词与参考图
+    if reference_image_url and reference_image_url.strip().startswith("http"):
+        ref_u = reference_image_url.strip()
+        print(f"[*] 启用参考图多模态绘图: {ref_u[:60]}...")
+        user_parts = [
+            {
+                "type": "text",
+                "text": f"Reference the character and object appearance, colors, and key visual features from the provided reference image to generate a high quality artwork: {clean_prompt}"
+            },
+            {
+                "type": "image_url",
+                "image_url": {"url": ref_u}
+            }
+        ]
+    else:
+        user_parts = f"Draw a high quality masterpiece image: {clean_prompt}"
+
     url = f"{BASE_URL.rstrip('/')}/chat/completions"
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -42,7 +60,7 @@ async def generate_picture_gemini(
     payload = {
         "model": IMAGE_GEN_MODEL,
         "messages": [
-            {"role": "user", "content": f"Draw a high quality image: {clean_prompt}"}
+            {"role": "user", "content": user_parts}
         ]
     }
 

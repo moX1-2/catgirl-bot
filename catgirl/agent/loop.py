@@ -27,14 +27,29 @@ from ..tools.definitions import (
     WORKSPACE_RUN_TOOL_DEFINITION,
     WORKSPACE_WRITE_TOOL_DEFINITION,
     WORKSPACE_READ_TOOL_DEFINITION,
-    WORKSPACE_LIST_TOOL_DEFINITION
+    WORKSPACE_LIST_TOOL_DEFINITION,
+    FETCH_WEB_PAGE_TOOL_DEFINITION
 )
 from ..tools.tavily import perform_tavily_search
 from ..tools.svg import render_svg_to_png_base64
 from ..tools.tts import generate_speech_gemini
 from ..tools.paint import generate_picture_gemini
+from ..tools.fetch import fetch_web_page_content
 from ..workspace import workspace_manager
 from ..tools.image import fetch_image_as_base64
+
+
+ALL_AGENT_TOOLS = [
+    TAVILY_TOOL_DEFINITION,
+    FETCH_WEB_PAGE_TOOL_DEFINITION,
+    DRAW_SVG_TOOL_DEFINITION,
+    GENERATE_IMAGE_TOOL_DEFINITION,
+    SEND_VOICE_TOOL_DEFINITION,
+    WORKSPACE_RUN_TOOL_DEFINITION,
+    WORKSPACE_WRITE_TOOL_DEFINITION,
+    WORKSPACE_READ_TOOL_DEFINITION,
+    WORKSPACE_LIST_TOOL_DEFINITION
+]
 
 async def ask_llm(
     session_key: str,
@@ -90,7 +105,7 @@ async def ask_llm(
             response = await client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=messages_to_send,
-                tools=[TAVILY_TOOL_DEFINITION, DRAW_SVG_TOOL_DEFINITION, GENERATE_IMAGE_TOOL_DEFINITION, SEND_VOICE_TOOL_DEFINITION, WORKSPACE_RUN_TOOL_DEFINITION, WORKSPACE_WRITE_TOOL_DEFINITION, WORKSPACE_READ_TOOL_DEFINITION, WORKSPACE_LIST_TOOL_DEFINITION],
+                tools=ALL_AGENT_TOOLS,
                 tool_choice="auto",
                 max_tokens=700,
                 temperature=0.85,
@@ -105,7 +120,7 @@ async def ask_llm(
                 response = await client.chat.completions.create(
                     model=MODEL_NAME,
                     messages=messages_to_send,
-                    tools=[TAVILY_TOOL_DEFINITION, DRAW_SVG_TOOL_DEFINITION],
+                    tools=ALL_AGENT_TOOLS,
                     tool_choice="auto",
                     max_tokens=700,
                     temperature=0.85,
@@ -119,13 +134,13 @@ async def ask_llm(
         reply = ""
 
         # 自主 Agent 多轮思考、工具调用与视觉重绘循环 (上限 10 轮，模型自主决定何时收敛)
-        for step in range(10):
+        for step in range(15):
             if not current_msg.tool_calls:
                 reply = (current_msg.content or "").strip()
                 print(f"[*] Agent 自主决定收敛完成 (轮次 {step})，正在组织最终回复...")
                 break
 
-            print(f"[*] Agent 自主循环 (轮次 {step+1}/10): 触发 {len(current_msg.tool_calls)} 个工具调用")
+            print(f"[*] Agent 自主循环 (轮次 {step+1}/15): 触发 {len(current_msg.tool_calls)} 个工具调用")
             messages_to_send.append(current_msg)
 
             for tc in current_msg.tool_calls:
@@ -162,24 +177,36 @@ async def ask_llm(
                             "tool_call_id": tc.id,
                             "content": f"语音合成未成功: {v_err}"
                         })
+                elif fn_name == "fetch_web_page":
+                    w_url = args.get("url", "")
+                    print(f"[*] 执行网页深度抓取与阅读 (轮次 {step+1}): {w_url[:60]}")
+                    page_content = await fetch_web_page_content(w_url)
+                    messages_to_send.append({"role": "tool", "tool_call_id": tc.id, "content": page_content})
                 elif fn_name == "generate_image":
                     p_prompt = args.get("prompt", "")
-                    print(f"[*] 执行 AI 绘画大模型 (gemini-3.1-flash-image) (轮次 {step+1}): {p_prompt[:40]}")
-                    b64_img, err_msg = await generate_picture_gemini(p_prompt)
+                    p_ref = args.get("reference_image_url")
+                    print(f"[*] 执行 AI 绘画大模型 (gemini-3.1-flash-image) (轮次 {step+1}): {p_prompt[:40]} (参考图: {bool(p_ref)})")
+                    b64_img, err_msg = await generate_picture_gemini(p_prompt, reference_image_url=p_ref)
                     if b64_img:
                         generated_svg_b64 = b64_img
                         messages_to_send.append({
                             "role": "tool",
                             "tool_call_id": tc.id,
-                            "content": "AI 绘画已成功生成！"
+                            "content": "AI 绘画已成功生成并光栅化为高清图片！"
                         })
-                        # 视觉回显反馈：将 AI 生成的图像直接喂给模型眼睛
+                        # 视觉回显自检与审美严格把关反馈
                         messages_to_send.append({
                             "role": "user",
                             "content": [
                                 {
                                     "type": "text",
-                                    "text": "【视觉回显自检】这是刚才为你生成的 AI 画面。如果你觉得满意，请直接向用户进行最终的图画赏析与说明；若有不满意且在额度内可微调。"
+                                    "text": (
+                                        "【视觉回显自检与审美把关】这是刚才为你生成的渲染画面喵！请用你的眼睛仔细审阅五官、线条与构图细节：\n"
+                                        "- 如果画面【严重扭曲变形、肢体畸形、五官错乱、或者你觉得不好看/不合格】：\n"
+                                        "  请在回复正文中明确标注 [REJECT_IMAGE]，并向用户幽默坦白画崩了揉成纸团丢掉啦（系统将直接拦截并彻底销毁丑图，绝不发送给用户辣眼睛！）；\n"
+                                        "- 只有当你打心底觉得画面【好看、合格、令人赏心悦目】时，才在正文中包含 [ACCEPT_IMAGE]，系统才会将高清图片发送给用户。\n"
+                                        "请据此组织你最终向用户回复的图解赏析文案。"
+                                    )
                                 },
                                 {
                                     "type": "image_url",
@@ -252,7 +279,7 @@ async def ask_llm(
             next_resp = await client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=messages_to_send,
-                tools=[TAVILY_TOOL_DEFINITION, DRAW_SVG_TOOL_DEFINITION],
+                tools=ALL_AGENT_TOOLS,
                 tool_choice="auto",
                 max_tokens=700,
                 temperature=0.85,
@@ -271,6 +298,15 @@ async def ask_llm(
                 temperature=0.85,
             )
             reply = (final_resp.choices[0].message.content or "").strip()
+
+        # 审美严格自检验收过滤 (不好看的直接拦截销毁，绝不外发)
+        if "[REJECT_IMAGE]" in reply or "[REJECT]" in reply.upper():
+            print("[-] 模型审美自检验收未通过 (触发 [REJECT_IMAGE])，自动拦截销毁丑图！")
+            generated_svg_b64 = None
+            reply = re.sub(r"\[REJECT_IMAGE\]|\[ACCEPT_IMAGE\]", "", reply, flags=re.I).strip()
+        elif "[ACCEPT_IMAGE]" in reply:
+            print("[+] 模型审美自检验收通过 (触发 [ACCEPT_IMAGE])，放行发送图片！")
+            reply = re.sub(r"\[REJECT_IMAGE\]|\[ACCEPT_IMAGE\]", "", reply, flags=re.I).strip()
 
         # 兜底：若模型正文包含裸 SVG 代码，自动渲染为图片并剥离 XML
         if not generated_svg_b64 and ("<svg" in reply.lower() and "</svg>" in reply.lower()):
