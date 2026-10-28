@@ -1,6 +1,6 @@
-# 🐾 DSH Catgirl Agent (小橘 QQ Bot)
+# 🐾 Catgirl QQ Bot (小橘)
 
-> 基于 **DeepSeek Harness (DSH)** 理念与 **OneBot 11** 协议的高性能、自反思多模态猫娘 QQ 机器人智能体。
+> 基于 **OneBot 11** 协议的高性能多模态猫娘 QQ 机器人 (自带 Gemini TTS 原生语音 / 视觉感知 / 矢量绘图 / 长回复折叠)。
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Protocol](https://img.shields.io/badge/OneBot-11-red.svg)](https://11.onebot.dev/)
@@ -93,8 +93,8 @@ sudo apt install -y python3 python3-pip librsvg2-bin fonts-wqy-microhei
 ### 2. 克隆与安装 Python 依赖
 
 ```bash
-git clone https://github.com/moX1-2/dsh-catgirl-agent.git
-cd dsh-catgirl-agent
+git clone https://github.com/moX1-2/catgirl-bot.git
+cd catgirl-bot
 pip install -r requirements.txt
 ```
 
@@ -150,7 +150,7 @@ After=network.target
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/path/to/dsh-catgirl-agent
+WorkingDirectory=/path/to/catgirl-bot
 ExecStart=/usr/bin/python3 -u catgirl.py
 Restart=always
 RestartSec=5
