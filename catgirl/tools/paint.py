@@ -152,14 +152,16 @@ async def generate_picture_gemini(
 
     if reference_image_url and reference_image_url.strip().startswith("http"):
         ref_u = reference_image_url.strip()
-        print(f"[*] 启用参考图多模态生图 (带动态姿势强化): {ref_u[:60]}...")
+        print(f"[*] 启用参考图多模态生图 (严格隔离背景，用户指定场景优先): {ref_u[:60]}...")
         user_parts = [
             {
                 "type": "text",
                 "text": (
-                    f"Faithfully preserve the character identity, outfit, face, and colors from the provided reference image, "
-                    f"but render them in a lively, exciting, non-monotonous anime pose with expressive interaction and cinematic atmosphere: "
-                    f"{quality_booster}. Description: {enriched_prompt}"
+                    f"USER'S MANDATORY CORE INSTRUCTION (HIGHEST PRIORITY): {clean_prompt}\n\n"
+                    f"REFERENCE IMAGE GUIDANCE: Use the provided reference image EXCLUSIVELY to recognize the character's facial features, hair style/color, and specific character design. "
+                    f"CRITICAL OVERRIDE: DO NOT COPY THE BACKGROUND, SCENE, OR SURROUNDING ENVIRONMENT FROM THE REFERENCE IMAGE! "
+                    f"You MUST place the characters into the EXACT setting and action demanded by the user above (Setting & Action: {clean_prompt}). "
+                    f"Composition & Dynamic Style: {quality_booster}. Additional details: {enriched_prompt}"
                 )
             },
             {
@@ -169,8 +171,9 @@ async def generate_picture_gemini(
         ]
     else:
         user_parts = (
+            f"USER'S MANDATORY CORE INSTRUCTION: {clean_prompt}\n\n"
             f"Draw a high quality anime masterpiece with dynamic pose and expressive lighting: "
-            f"{quality_booster}. Description: {enriched_prompt}"
+            f"{quality_booster}. Detailed composition: {enriched_prompt}"
         )
 
     url = f"{BASE_URL.rstrip('/')}/chat/completions"
