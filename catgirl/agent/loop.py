@@ -300,18 +300,16 @@ async def ask_llm(
             )
             reply = (final_resp.choices[0].message.content or "").strip()
 
-        # 审美严格自检验收与多候选比选过滤
+        # 审美自检验收与多候选比选 (永远不吞图，确保用户总能收到最佳画面产物)
         if "[SELECT_2]" in reply and len(active_candidate_images) >= 2:
             print("[+] 模型自检选中【候选图 2】出站！")
             generated_svg_b64 = active_candidate_images[1]
         elif "[SELECT_1]" in reply and len(active_candidate_images) >= 1:
             print("[+] 模型自检选中【候选图 1】出站！")
             generated_svg_b64 = active_candidate_images[0]
-        elif "[REJECT_ALL]" in reply or "[REJECT_IMAGE]" in reply or "[REJECT]" in reply.upper():
-            print("[-] 模型审美自检验收未通过，自动拦截销毁所有残次候选图！")
-            generated_svg_b64 = None
         elif active_candidate_images:
-            print("[*] 模型自检默认放行【候选图 1】")
+            # 即使模型觉得存在瑕疵，也始终放行两张中更优的一张出站，坚决杜绝“把图吞掉只发文字”的恶性体验！
+            print("[*] 模型自检完成，放行最佳候选画面出站 (杜绝吞图)！")
             generated_svg_b64 = active_candidate_images[0]
 
         reply = re.sub(r"\[SELECT_[12]\]|\[REJECT_ALL\]|\[REJECT_IMAGE\]|\[ACCEPT_IMAGE\]", "", reply, flags=re.I).strip()
