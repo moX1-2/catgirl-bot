@@ -70,20 +70,42 @@ GENERATE_IMAGE_TOOL_DEFINITION = {
     "type": "function",
     "function": {
         "name": "generate_image",
-        "description": "【方案B：AI 绘画大模型 (gemini-3.1-flash-image 双候选机制)】调用专业绘图大模型并发生成 2 张不同视角的候选画面供你视觉自检比选 (Best-of-N)。全面支持【参考图生图 (Image-to-Image)】与多人解剖防崩结构注入。重要规范：画具体角色必须先 tavily_search 搜官方参考图；遇到双人亲吻拥抱必须采用侧颜视角防止面部融化与肢体错乱！受 1 分钟最多 8 张配额保护。",
+        "description": "【方案B：AI 绘画大模型 (gemini-3.1-flash-image 结构化生图引擎)】并发生成 2 张候选图供视觉自检比选 (Best-of-N)。采用结构化字段由你直接指定画面类别、主体、动作与场景，系统将自动确定性加载对应领域的物理与解剖守卫！",
         "parameters": {
             "type": "object",
             "properties": {
-                "prompt": {
+                "category": {
                     "type": "string",
-                    "description": "生动的画面提示词。重要：严禁生成呆板站桩立正！必须包含生动具体的动态姿势（如向前伸手邀请、空中飞舞旋转、微侧身回眸、抚发wink、帅气战斗起手式、慵懒倚坐等）、戏剧性镜头视角（微仰角/微俯角/近景景深）与环境光影细节！"
+                    "enum": [
+                        "sports_athletics",
+                        "multi_character_intimate",
+                        "single_character_portrait",
+                        "general_anime_art"
+                    ],
+                    "description": "画面语义分类 (至关重要！): sports_athletics(球类/运动竞技，将自动激活严格单球物理守卫); multi_character_intimate(双人/多人亲密互动，如接吻/拥抱，自动激活侧颜防融化与肢体防粘连守卫); single_character_portrait(单人立绘，激活动态姿态与电影构图); general_anime_art(通用插画/风景)"
+                },
+                "subject": {
+                    "type": "string",
+                    "description": "画面核心主体（如：昔涟与爱莉希雅、流萤、琪亚娜与芽衣）"
+                },
+                "action_and_pose": {
+                    "type": "string",
+                    "description": "角色的生动具体动作与姿态（如：昔涟飞身扑救、爱莉希雅起跳扣杀；双人亲吻必须采用侧颜视角 profile view 避免五官融化）"
+                },
+                "setting_and_scene": {
+                    "type": "string",
+                    "description": "用户指定的具体背景与环境（如：夏日阳光沙滩排球场、微风草地、夕阳天台），背景会被严格锁定，防止被参考图污染！"
                 },
                 "reference_image_url": {
                     "type": "string",
-                    "description": "官方或网络参考图片的 HTTP/HTTPS 直链（从 tavily_search 结果或群聊上下文获取，模型将精准对齐参考图的外观特征）"
+                    "description": "官方参考图 HTTP/HTTPS 直链（用于角色发型/配色对齐，背景会被自动隔离）"
+                },
+                "prompt": {
+                    "type": "string",
+                    "description": "补充的画面氛围、光影与英文细节提示词（可选）"
                 }
             },
-            "required": ["prompt"]
+            "required": ["category", "subject", "action_and_pose"]
         }
     }
 }

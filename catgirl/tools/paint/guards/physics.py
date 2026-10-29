@@ -5,12 +5,12 @@
 """
 
 SPORTS_PHYSICS_GUARD = (
-    "SPORTS PROPS & PHYSICAL LOGIC ANCHOR (STRICT COMPLIANCE): "
-    "1. SINGLE BALL CONSTRAINTS: In any ball game or athletic sport scene (volleyball, basketball, soccer, tennis, beach volleyball), "
-    "THERE MUST BE EXACTLY ONE SINGLE BALL IN THE ENTIRE SCENE (STRICTLY ONE BALL ONLY). "
-    "FORBIDDEN: Absolutely NO duplicate balls, NO multiple volleyballs, NO extra balls floating near players! "
-    "All players on court must interact with or focus their attention on the SAME SINGLE BALL in mid-air or mid-play. "
-    "2. Dynamic Particle Physics: Realistic splashing sand, kicked-up dust, water droplets, and authentic kinetic momentum."
+    "SPORTS PROPS & PHYSICAL LOGIC ANCHOR (STRICT SINGLE-MENTION RULE): "
+    "1. STRICTLY ONE BALL ONLY: In any ball game or athletic sport (volleyball, basketball, soccer, tennis), "
+    "THERE IS ONLY ONE SINGLE FLYING BALL IN THE ENTIRE COMPOSITION. "
+    "NEVER create duplicate balls! Character slots must describe body motions only (e.g. forearms joined in bump stance, leaping arm swing), "
+    "while the ball is declared strictly ONCE as a unique shared object suspended between players. "
+    "2. Kinetic Momentum: Realistic sand splashing, dynamic speed blur, and water droplets."
 )
 
 BALL_SPORTS_KEYWORDS = [

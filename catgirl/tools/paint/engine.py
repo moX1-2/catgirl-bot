@@ -5,7 +5,7 @@
 
 import re
 import asyncio
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Any
 import httpx
 
 from ...config import API_KEY, BASE_URL, IMAGE_GEN_MODEL, IMAGE_GEN_CANDIDATES
@@ -56,18 +56,18 @@ async def _fetch_single_candidate(user_parts, variation_tag: str, timeout: float
     return None
 
 async def generate_picture_gemini(
-    prompt: str,
+    prompt_or_args: Any,
     reference_image_url: Optional[str] = None,
     candidate_count: int = IMAGE_GEN_CANDIDATES,
     timeout: float = 95.0
 ) -> Tuple[List[str], str]:
     """
-    模块化装配与并发双候选调用主入口
+    模块化结构化装配与并发双候选调用主入口
+    支持直接接收模型结构化字典参数 (category/subject/action/setting) 或传统 prompt 字符串
     受到 1 分钟 8 张滑动窗口保护
     返回: (candidate_base64_images_list, error_message)
     """
-    clean_prompt = prompt.strip()
-    if not clean_prompt:
+    if not prompt_or_args:
         return [], "绘画提示词为空喵。"
 
     # 1. 频率限制检查 (按候选张数扣除额度)
@@ -75,8 +75,8 @@ async def generate_picture_gemini(
     if not allowed:
         return [], f"[绘图限频保护] {reason}"
 
-    # 2. 模块化动态上下文装配 Payload
-    user_payload = compose_generation_payload(clean_prompt, reference_image_url)
+    # 2. 模块化动态上下文装配 Payload (结构化模型判定 + 确定性守卫注入)
+    user_payload = compose_generation_payload(prompt_or_args, reference_image_url)
 
     # 3. 并发双候选生成
     print(f"[*] 模块化生图引擎启动: 并发生成 {candidate_count} 张候选画面以供比选...")
