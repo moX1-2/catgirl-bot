@@ -232,6 +232,18 @@ async def process_message_event(ws, event: Dict[str, Any]):
         )
 
         sent_via_forward = False
+        # 防御性解包：确保 gen_img 必定为合法纯正 Base64 字符串
+        if gen_img:
+            if isinstance(gen_img, (list, tuple)) and gen_img:
+                gen_img = gen_img[0]
+            elif isinstance(gen_img, str) and gen_img.startswith("["):
+                try:
+                    parsed = json.loads(gen_img)
+                    if isinstance(parsed, list) and parsed:
+                        gen_img = parsed[0]
+                except Exception:
+                    pass
+
         if is_long_reply:
             print(f"[*] 检测到长文本回复 (长度: {len(clean_reply)} 字, {len(clean_reply.splitlines())} 行)，自动折叠打包为合并转发...")
             # 1. 先发送简短引用提示
