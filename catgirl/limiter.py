@@ -50,19 +50,20 @@ class DmRateLimiter:
 
 
 class ImageGenerationRateLimiter:
-    """绘画速率限制器：滑动窗口限制 1 分钟最多生成 3 张图片，支持视觉自检重绘"""
+    """绘画速率限制器：滑动窗口限制 1 分钟最多生成 8 张图片 (支持每次双候选并发及自检重绘)"""
     def __init__(self, max_per_minute=IMAGE_GEN_MAX_PER_MINUTE):
         self.max_per_minute = max_per_minute
         self.timestamps = deque()
 
-    def allow(self) -> tuple[bool, str]:
+    def allow(self, count: int = 1) -> tuple[bool, str]:
         now = time.time()
         while self.timestamps and self.timestamps[0] <= now - 60.0:
             self.timestamps.popleft()
-        if len(self.timestamps) >= self.max_per_minute:
-            wait_sec = int(60.0 - (now - self.timestamps[0])) + 1
-            return False, f"阿橘画画爪子要冒烟啦喵（绘图生成限制 1 分钟最多 {self.max_per_minute} 张），还需冷却 {wait_sec} 秒，可以先让阿橘画极速 SVG 矢量图喵！"
-        self.timestamps.append(now)
+        if len(self.timestamps) + count > self.max_per_minute:
+            wait_sec = int(60.0 - (now - self.timestamps[0])) + 1 if self.timestamps else 15
+            return False, f"阿橘画画爪子要冒烟啦喵（绘图限制 1 分钟最多 {self.max_per_minute} 张，当前剩余额度不足 {count} 张），还需冷却 {wait_sec} 秒喵！"
+        for _ in range(count):
+            self.timestamps.append(now)
         return True, ""
 
 class BlacklistManager:

@@ -31,7 +31,8 @@ API_KEY = os.getenv("LLM_API_KEY", "")
 BASE_URL = os.getenv("LLM_BASE_URL", "https://api.openai.com/v1")
 MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-3.8-flash-medium")
 IMAGE_GEN_MODEL = os.getenv("IMAGE_GEN_MODEL", "gemini-3.1-flash-image")  # AI 绘图生图大模型
-IMAGE_GEN_MAX_PER_MINUTE = int(os.getenv("IMAGE_GEN_MAX_PER_MINUTE", "3"))  # 1分钟最多 3 张
+IMAGE_GEN_MAX_PER_MINUTE = int(os.getenv("IMAGE_GEN_MAX_PER_MINUTE", "8"))  # 1分钟最多 8 张图片配额
+IMAGE_GEN_CANDIDATES = int(os.getenv("IMAGE_GEN_CANDIDATES", "2"))        # 每次并发生成 2 张候选图供视觉自检比选
 LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "60.0"))  # 异步请求超时时间 (秒)
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "1"))
 

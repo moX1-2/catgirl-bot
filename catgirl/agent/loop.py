@@ -131,6 +131,7 @@ async def ask_llm(
 
         generated_svg_b64 = None
         generated_voice_b64 = None
+        active_candidate_images = []
         reply = ""
 
         # 自主 Agent 多轮思考、工具调用与视觉重绘循环 (上限 10 轮，模型自主决定何时收敛)
@@ -299,14 +300,21 @@ async def ask_llm(
             )
             reply = (final_resp.choices[0].message.content or "").strip()
 
-        # 审美严格自检验收过滤 (不好看的直接拦截销毁，绝不外发)
-        if "[REJECT_IMAGE]" in reply or "[REJECT]" in reply.upper():
-            print("[-] 模型审美自检验收未通过 (触发 [REJECT_IMAGE])，自动拦截销毁丑图！")
+        # 审美严格自检验收与多候选比选过滤
+        if "[SELECT_2]" in reply and len(active_candidate_images) >= 2:
+            print("[+] 模型自检选中【候选图 2】出站！")
+            generated_svg_b64 = active_candidate_images[1]
+        elif "[SELECT_1]" in reply and len(active_candidate_images) >= 1:
+            print("[+] 模型自检选中【候选图 1】出站！")
+            generated_svg_b64 = active_candidate_images[0]
+        elif "[REJECT_ALL]" in reply or "[REJECT_IMAGE]" in reply or "[REJECT]" in reply.upper():
+            print("[-] 模型审美自检验收未通过，自动拦截销毁所有残次候选图！")
             generated_svg_b64 = None
-            reply = re.sub(r"\[REJECT_IMAGE\]|\[ACCEPT_IMAGE\]", "", reply, flags=re.I).strip()
-        elif "[ACCEPT_IMAGE]" in reply:
-            print("[+] 模型审美自检验收通过 (触发 [ACCEPT_IMAGE])，放行发送图片！")
-            reply = re.sub(r"\[REJECT_IMAGE\]|\[ACCEPT_IMAGE\]", "", reply, flags=re.I).strip()
+        elif active_candidate_images:
+            print("[*] 模型自检默认放行【候选图 1】")
+            generated_svg_b64 = active_candidate_images[0]
+
+        reply = re.sub(r"\[SELECT_[12]\]|\[REJECT_ALL\]|\[REJECT_IMAGE\]|\[ACCEPT_IMAGE\]", "", reply, flags=re.I).strip()
 
         # 兜底：若模型正文包含裸 SVG 代码，自动渲染为图片并剥离 XML
         if not generated_svg_b64 and ("<svg" in reply.lower() and "</svg>" in reply.lower()):

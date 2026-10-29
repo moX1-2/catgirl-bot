@@ -2,22 +2,36 @@
 """
 Gemini 3.1 Flash Image AI 绘图生成模块
 支持利用 gemini-3.1-flash-image 绘制高质量插画、二次元、写实场景与艺术图
-内置 1 分钟 3 张滑动窗口保护、多主题分类动态姿势与电影级构图场景扩充库
+内置：
+1. 1 分钟 8 张滑动窗口保护 (每次并发抽选 2 张候选图供视觉自检比选)
+2. 多人动作与解剖防崩结构锚点 (坚决杜绝三只手、肢体错乱、多余手指、面部融化)
+3. 动态姿势库与电影级场景扩展
+4. 参考图背景绝对隔离
 """
 
 import re
 import json
 import random
 import asyncio
-from typing import Tuple, Optional
+from typing import Tuple, List, Optional
 import httpx
 
-from ..config import API_KEY, BASE_URL, IMAGE_GEN_MODEL
+from ..config import API_KEY, BASE_URL, IMAGE_GEN_MODEL, IMAGE_GEN_CANDIDATES
 from ..limiter import image_limiter
 
-# ================== 多维度生动姿势分类库 (Danbooru & Illustrious 级动作提炼) ==================
+# 多人互动与解剖防崩结构锚点 (Danbooru 级防肢体融化、防三只手、防脸部畸变规范)
+MULTI_PERSON_ANATOMY_ANCHORS = (
+    "CRITICAL MULTI-CHARACTER ANATOMICAL & COMPOSITION RULES: "
+    "Clean and distinct separation of the two characters. Exactly two people in frame. "
+    "Anatomically correct human anatomy: each character has exactly two arms, two hands, and five fingers per hand. "
+    "STRICTLY NO extra arms, NO extra hands, NO floating limbs, NO fused bodies, NO mutated or deformed fingers. "
+    "For kissing or intimate embrace: side profile view or clean three-quarter profile shot, "
+    "natural head tilt and angle, clear facial boundary lines, lips touching clearly without facial melting or overlapping distortion, "
+    "natural hand placement on shoulder or cheek, romantic intimate atmosphere with depth of field."
+)
+
+# 动态姿势分类库
 THEMATIC_POSES = {
-    # 1. 软萌日常与亲昵互动 (Cute & Casual)
     "cute_casual": [
         "leaning forward playfully with one hand reaching out toward viewer with open palm, gentle head tilt, dynamic foreshortening, intimate connection",
         "sitting comfortably on a scenic balustrade or stone ledge, dangling legs with one knee raised, relaxed natural posture, tilting head upward to the sky",
@@ -28,7 +42,6 @@ THEMATIC_POSES = {
         "holding a fluffy cat or mascot plushie close to chest, nuzzling face into it with a sweet contented grin",
         "tucking a soft stray strand of hair behind ear, looking directly into camera with shy blushing smile, intimate framing"
     ],
-    # 2. 高燃战斗与疾走动感 (Dynamic & Action)
     "dynamic_action": [
         "dynamic combat action stance with glowing energy particles swirling around hands, dramatic low angle shot, hair billowing with motion blur",
         "turning back mid-motion to look over shoulder with a radiant determined expression, running turn, dynamic hair and skirt fluttering in the wind",
@@ -38,7 +51,6 @@ THEMATIC_POSES = {
         "casting an intricate glowing magic circle in front of hands, concentrated magic glow illuminating face in sharp contrast",
         "holding weapons ready at side, turning sharply with motion blur, fierce intense eyes, dynamic perspective"
     ],
-    # 3. 唯美意境与轻盈空灵 (Dreamy & Ethereal)
     "dreamy_poetic": [
         "floating weightlessly in mid-air in zero gravity, legs slightly curved in elegant flow, floating ribbons and hair strands, ethereal dreamscape",
         "gently holding a glowing star lantern, lightly lifting dress hem with one hand while turning along a petal-strewn path",
@@ -49,7 +61,6 @@ THEMATIC_POSES = {
     ]
 }
 
-# 镜头构图与透视视角库
 CAMERA_PERSPECTIVES = [
     "cinematic low angle perspective with dynamic diagonal framing and sense of scale",
     "slight high angle looking down with dramatic depth of field and soft circular bokeh",
@@ -59,7 +70,6 @@ CAMERA_PERSPECTIVES = [
     "wide environmental shot balancing the character silhouette with breathtaking panoramic scenery"
 ]
 
-# 电影级场景氛围库
 ATMOSPHERIC_SCENES = {
     "cosmic_fantasy": [
         "surrounded by glowing bioluminescent fireflies and floating golden light orbs under a starry cosmic night sky and nebula aurora",
@@ -81,22 +91,23 @@ ATMOSPHERIC_SCENES = {
 }
 
 def enrich_prompt_with_dynamics(clean_prompt: str) -> str:
-    """
-    根据用户输入智能判断：
-    - 若用户已明确指定动作或场景，严格保留并仅补充镜头视角与光影；
-    - 若未具体指定动作，按语义智能匹配（战斗/软萌/唯美/日常）抽选生动的姿势与镜头！
-    """
     p_lower = clean_prompt.lower()
 
     pose_keywords = ["坐", "躺", "跑", "战", "飞", "吃", "拿", "看", "笑", "站", "握", "跃", "挥", "pose", "stand", "sit", "run", "jump", "eating", "fighting"]
     scene_keywords = ["在", "背景", "天台", "海", "夜", "星", "森林", "花", "街", "房", "学", "城", "水", "空", "background", "scene", "night", "sky", "room"]
+    multi_person_keywords = ["亲吻", "吻", "拥抱", "抱", "贴贴", "和", "与", "俩", "两人", "双人", "两只", "kiss", "hug", "together", "each other", "two girls", "couple", "yuri", "yaoi"]
 
     has_custom_pose = any(w in p_lower for w in pose_keywords)
     has_custom_scene = any(w in p_lower for w in scene_keywords)
+    is_multi_person = any(w in p_lower for w in multi_person_keywords)
 
     modifiers = []
 
-    # 1. 姿势补充
+    # 1. 多人互动解剖防崩结构注入
+    if is_multi_person:
+        modifiers.append(MULTI_PERSON_ANATOMY_ANCHORS)
+
+    # 2. 姿势补充
     if not has_custom_pose:
         has_action = any(w in p_lower for w in ["战", "打", "剑", "刀", "魔", "机甲", "fight", "battle", "sword", "weapon", "action"])
         has_dreamy = any(w in p_lower for w in ["星", "梦", "海", "空", "月", "花", "dream", "star", "space", "moon", "flower"])
@@ -109,10 +120,10 @@ def enrich_prompt_with_dynamics(clean_prompt: str) -> str:
             chosen_pose = random.choice(THEMATIC_POSES["cute_casual"])
         modifiers.append(chosen_pose)
 
-    # 2. 镜头视角补充
+    # 3. 镜头视角补充
     modifiers.append(random.choice(CAMERA_PERSPECTIVES))
 
-    # 3. 场景氛围补充
+    # 4. 场景氛围补充
     if not has_custom_scene:
         all_scenes = sum(ATMOSPHERIC_SCENES.values(), [])
         modifiers.append(random.choice(all_scenes))
@@ -120,33 +131,77 @@ def enrich_prompt_with_dynamics(clean_prompt: str) -> str:
     extra_str = ", ".join(modifiers)
     return f"{clean_prompt}. Dynamic artistic composition: {extra_str}"
 
+async def _fetch_single_candidate(user_parts, variation_tag: str, timeout: float = 95.0) -> Optional[str]:
+    """单路异步生图生成"""
+    parts = list(user_parts) if isinstance(user_parts, list) else user_parts
+    if isinstance(parts, list) and parts and parts[0].get("type") == "text":
+        parts = [
+            {"type": "text", "text": parts[0]["text"] + f"\nCamera & Composition Variation: {variation_tag}"}
+        ] + parts[1:]
+    elif isinstance(parts, str):
+        parts = parts + f"\nCamera & Composition Variation: {variation_tag}"
+
+    url = f"{BASE_URL.rstrip('/')}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    payload = {
+        "model": IMAGE_GEN_MODEL,
+        "messages": [{"role": "user", "content": parts}],
+        "temperature": 0.95
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                choices = data.get("choices", [])
+                if choices:
+                    content = choices[0].get("message", {}).get("content", "")
+                    m = re.search(r"data:image/(?:jpeg|png|webp|jpg);base64,([A-Za-z0-9+/=]+)", content)
+                    if m:
+                        return m.group(1)
+                    m_url = re.search(r"https?://[^\s\)\"\']+\.(?:png|jpg|jpeg|webp)", content)
+                    if m_url:
+                        from .image import fetch_image_as_base64
+                        b64_from_url = await fetch_image_as_base64(m_url.group(0))
+                        if b64_from_url:
+                            return re.sub(r"^data:image/[^;]+;base64,", "", b64_from_url)
+    except Exception as e:
+        print(f"[-] 候选图生成异常 ({variation_tag}): {e}")
+    return None
+
 async def generate_picture_gemini(
     prompt: str,
     reference_image_url: Optional[str] = None,
+    candidate_count: int = IMAGE_GEN_CANDIDATES,
     timeout: float = 95.0
-) -> Tuple[Optional[str], str]:
+) -> Tuple[List[str], str]:
     """
-    调用 gemini-3.1-flash-image 生成高质量图像 Base64
-    全面支持文生图与【参考图生图 (Image-to-Image)】
-    受到 1 分钟 3 次的滑动窗口频率限制
-    自动注入动态姿势与戏剧性视角增强
-    返回: (base64_image_data, error_message)
+    调用 gemini-3.1-flash-image 并发生成多张候选图像 (默认 2 张)，供视觉反思比选
+    支持参考图生图 (Image-to-Image) 与多人互动解剖防崩结构锚点
+    受到 1 分钟 8 张的滑动窗口频率保护
+    返回: (candidate_base64_images_list, error_message)
     """
     clean_prompt = prompt.strip()
     if not clean_prompt:
-        return None, "绘画提示词为空喵。"
+        return [], "绘画提示词为空喵。"
 
-    # 1. 频率限制检查 (1分钟3张)
-    allowed, reason = image_limiter.allow()
+    # 1. 频率限制检查 (按候选张数扣除额度)
+    allowed, reason = image_limiter.allow(count=candidate_count)
     if not allowed:
-        return None, f"[绘图限频保护] {reason}"
+        return [], f"[绘图限频保护] {reason}"
 
-    # 2. 动态姿势与场景丰富化
+    # 2. 动态姿势、多人解剖结构与场景丰富化
     enriched_prompt = enrich_prompt_with_dynamics(clean_prompt)
 
     # 3. 组装多模态提示词与参考图
     quality_booster = (
         "masterpiece, best quality, top tier anime visual, expressive character acting, "
+        "anatomically correct limbs and hands with exactly five fingers per hand, "
         "flowing hair and dynamic fabric physics, cinematic volumetric lighting with rim light and rich atmospheric background"
     )
 
@@ -176,42 +231,22 @@ async def generate_picture_gemini(
             f"{quality_booster}. Detailed composition: {enriched_prompt}"
         )
 
-    url = f"{BASE_URL.rstrip('/')}/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
-    payload = {
-        "model": IMAGE_GEN_MODEL,
-        "messages": [
-            {"role": "user", "content": user_parts}
-        ]
-    }
+    # 4. 并发生成多张不同视角的候选图 (Candidate Variations)
+    print(f"[*] 正在并发请求生成 {candidate_count} 张候选画面以供视觉自检比选...")
+    variations = [
+        "Variation A: Dynamic three-quarter cinematic view with atmospheric rim light",
+        "Variation B: Intimate side profile view with shallow depth of field and soft romantic bokeh"
+    ]
 
-    try:
-        async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            if resp.status_code == 200:
-                data = resp.json()
-                choices = data.get("choices", [])
-                if choices:
-                    content = choices[0].get("message", {}).get("content", "")
-                    # 匹配 base64 图像
-                    m = re.search(r"data:image/(?:jpeg|png|webp|jpg);base64,([A-Za-z0-9+/=]+)", content)
-                    if m:
-                        b64_img = m.group(1)
-                        return b64_img, ""
-                    # 匹配普通 HTTP URL
-                    m_url = re.search(r"https?://[^\s\)\"\']+\.(?:png|jpg|jpeg|webp)", content)
-                    if m_url:
-                        from .image import fetch_image_as_base64
-                        b64_from_url = await fetch_image_as_base64(m_url.group(0))
-                        if b64_from_url:
-                            b64_clean = re.sub(r"^data:image/[^;]+;base64,", "", b64_from_url)
-                            return b64_clean, ""
-                return None, "绘图模型未输出有效图像数据。"
-            else:
-                return None, f"绘图模型返回状态码 {resp.status_code}: {resp.text[:120]}"
-    except Exception as e:
-        return None, f"绘图生成异常: {e}"
+    tasks = [
+        _fetch_single_candidate(user_parts, variations[i % len(variations)], timeout)
+        for i in range(candidate_count)
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    valid_candidates = [r for r in results if isinstance(r, str) and len(r) > 100]
+
+    if valid_candidates:
+        print(f"[+] 成功获取 {len(valid_candidates)} 张有效候选图！")
+        return valid_candidates, ""
+
+    return [], "未能生成有效候选图像，上游服务暂时未响应图像数据。"
