@@ -83,26 +83,31 @@
 ```text
 catgirl/
 ├── __init__.py
-├── config.py              # 配置中心：自动加载 .env 与系统环境变量
-├── prompts.py             # 核心人设：防提示词泄露与严格第四面墙守则
-├── clock.py               # UTC+8 墙钟：北京时间、星期与时段语义化
-├── limiter.py             # 速率限制器：Tavily 10次/分, 陌生人私聊 5条/分
+├── config.py              # 配置中心：环境常量、密钥池、限频阈值
+├── prompts.py             # 核心人设：轻量纯净提示词、防探针守则
+├── clock.py               # UTC+8 墙钟服务
+├── limiter.py             # 速率限制器 (Tavily限流 / 私聊限流 / 绘图8张滑动窗口 / 黑名单)
 ├── tools/                 # Agent 工具包
-│   ├── definitions.py     # Function Calling 工具 JSON Schema (tavily_search, draw_svg)
-│   ├── tavily.py          # Tavily 搜索网关：多 Key 故障转移与限流
-│   ├── svg.py             # SVG 渲染引擎：rsvg-convert + cairosvg 高清光栅化
-│   └── image.py           # 多模态图片预处理与 Base64 编码兜底
-├── agent/                 # Agent 核心大脑
-│   ├── client.py          # AsyncOpenAI 异步单例客户端
-│   ├── history.py         # 会话状态管理与 TTL 过期滑动窗口
-│   └── loop.py            # 10 轮多模态自反思主循环 (视觉回显反馈 + 异常自愈)
-├── onebot/                # 协议适配层
-│   ├── client.py          # OneBot 11 WebSocket 通信、加锁发送、异步 RPC
-│   ├── parser.py          # CQ 码解析、100+ QQ 原生表情映射、引用/转发递归
-│   └── context.py         # 群聊流动上下文环形缓冲区与视觉记忆池
-└── handlers/              # 业务路由层
-    ├── admin.py           # /help 菜单、/status 状态监控与管理员指令
-    └── dispatcher.py      # 事件派发器、唤醒判定与多模态回复下发
+│   ├── definitions.py     # Function Calling 工具 JSON Schema
+│   ├── tavily.py          # Tavily 联网检索网关
+│   ├── fetch.py           # 网页长文正文深度提取引擎
+│   ├── svg.py             # SVG 矢量光栅化渲染引擎
+│   ├── tts.py             # Gemini 3.8 Flash TTS 原生语音引擎 (Despina 导演音色)
+│   ├── image.py           # 多模态图片直传与 Base64 编解码兜底
+│   └── paint/             # 🎨 模块化 AI 绘图子系统 (JIT 动态上下文装配)
+│       ├── __init__.py    # 导出绘图入口
+│       ├── engine.py      # 双候选并发调用 (Best-of-N) 与 Base64 管道
+│       ├── composer.py    # 上下文语义识别与即时提示词合成器
+│       ├── lore.py        # 参考图背景绝对隔离与角色特征提取
+│       └── guards/        # 领域安全与解剖常识守卫
+│           ├── anatomy.py # 多人互动解剖守卫 (严格防三只手/五官融化)
+│           ├── physics.py # 运动道具物理守卫 (全场单球/防道具克隆)
+│           ├── camera.py  # 动态姿态大辞典与镜头透视库
+│           └── styles.py  # 电影级光影与场景氛围库
+├── workspace/             # 🗃️ 临时沙箱工作区与文件生命周期管理器
+├── agent/                 # Agent 核心大脑 (15轮自反思循环 / 双候选比选 / 异常自愈)
+├── onebot/                # OneBot 11 协议适配层 (递归穿透图包 / QQ原生纯文本清洗)
+└── handlers/              # 业务路由层 (长回复合并转发折叠 / 黑名单管理 / 指令派发)
 ```
 
 ---
