@@ -186,35 +186,52 @@ async def ask_llm(
                 elif fn_name == "generate_image":
                     p_prompt = args.get("prompt", "")
                     p_ref = args.get("reference_image_url")
-                    print(f"[*] 执行 AI 绘画大模型 (gemini-3.1-flash-image) (轮次 {step+1}): {p_prompt[:40]} (参考图: {bool(p_ref)})")
-                    b64_img, err_msg = await generate_picture_gemini(p_prompt, reference_image_url=p_ref)
-                    if b64_img:
-                        generated_svg_b64 = b64_img
+                    print(f"[*] 执行 AI 绘画大模型 (gemini-3.1-flash-image 并发双候选) (轮次 {step+1})")
+                    
+                    # 1. 结构化传参或字符串回退
+                    call_param = args if (isinstance(args, dict) and len(args) > 1) else (p_prompt or str(args))
+                    valid_candidates, err_msg = await generate_picture_gemini(call_param, reference_image_url=p_ref)
+                    
+                    if valid_candidates:
+                        active_candidate_images = valid_candidates
+                        # 确保默认保底为合法的纯 Base64 字符串 (防止类型泄露为 list)
+                        generated_svg_b64 = valid_candidates[0]
+                        
+                        # 2. 【工作区有机联动】：将生成的候选画作沉淀入沙箱工作区，供脚本读取或图像分析
+                        try:
+                            ws_dir = workspace_manager.get_workspace_path(session_key, create=True)
+                            for i_cand, c_b64 in enumerate(valid_candidates, 1):
+                                cand_path = os.path.join(ws_dir, f"candidate_{i_cand}.jpg")
+                                import base64 as b64_mod
+                                with open(cand_path, "wb") as f_cand:
+                                    f_cand.write(b64_mod.b64decode(c_b64))
+                            print(f"[+] 候选画作已有机归档至沙箱工作区: {ws_dir}")
+                        except Exception as e_ws:
+                            print(f"[-] 候选画作写入工作区异常: {e_ws}")
+
                         messages_to_send.append({
                             "role": "tool",
                             "tool_call_id": tc.id,
-                            "content": "AI 绘画已成功生成并光栅化为高清图片！"
+                            "content": f"AI 绘画已成功并发生成 {len(valid_candidates)} 张不同视角的候选图，并已归档至沙箱工作区 (candidate_1.jpg, candidate_2.jpg)！"
                         })
-                        # 视觉回显自检与审美严格把关反馈
-                        messages_to_send.append({
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": (
-                                        "【视觉回显自检与审美把关】这是刚才为你生成的渲染画面喵！请用你的眼睛仔细审阅五官、线条与构图细节：\n"
-                                        "- 如果画面【严重扭曲变形、肢体畸形、五官错乱、或者你觉得不好看/不合格】：\n"
-                                        "  请在回复正文中明确标注 [REJECT_IMAGE]，并向用户幽默坦白画崩了揉成纸团丢掉啦（系统将直接拦截并彻底销毁丑图，绝不发送给用户辣眼睛！）；\n"
-                                        "- 只有当你打心底觉得画面【好看、合格、令人赏心悦目】时，才在正文中包含 [ACCEPT_IMAGE]，系统才会将高清图片发送给用户。\n"
-                                        "请据此组织你最终向用户回复的图解赏析文案。"
-                                    )
-                                },
-                                {
-                                    "type": "image_url",
-                                    "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}
-                                }
-                            ]
-                        })
+                        
+                        # 3. 视觉回显双候选自检比选
+                        reflection_parts = [
+                            {
+                                "type": "text",
+                                "text": (
+                                    f"【视觉回显自检与多候选比选把关】本次为你并发生成了 {len(valid_candidates)} 张不同视角的候选图喵！\n"
+                                    "请用你的眼睛仔细审阅对比（重点检查：是否有三只手、多余手臂/手指、五官融化等肢体畸形，以及是否严格还原了名场面设定）：\n"
+                                    "- 如果【候选图1】肢体解剖更正常、人物特征与情感氛围更符合剧情，在回复正文中明确标注 [SELECT_1]；\n"
+                                    "- 如果【候选图2】肢体解剖更正常、人物特征与情感氛围更符合剧情，在回复正文中明确标注 [SELECT_2]；\n"
+                                    "请比选出最完美的一张，并在图解赏析中客观指出亮点与小瑕疵喵。"
+                                )
+                            }
+                        ]
+                        for idx_c, c_b64 in enumerate(valid_candidates, 1):
+                            reflection_parts.append({"type": "text", "text": f"--- 候选图 {idx_c} ---"})
+                            reflection_parts.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{c_b64}"}})
+                        messages_to_send.append({"role": "user", "content": reflection_parts})
                     else:
                         print(f"[-] AI 绘图未能生成: {err_msg}")
                         messages_to_send.append({
