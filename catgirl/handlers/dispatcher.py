@@ -271,12 +271,18 @@ async def process_message_event(ws, event: Dict[str, Any]):
                 ("group_id" if msg_type == "group" else "user_id"): (group_id if msg_type == "group" else user_id),
                 "messages": forward_nodes
             }
-            fwd_resp = await call_api(ws, fwd_action, fwd_params, timeout=6.0)
+            # 超时设为 25.0 秒，给大体积图片和企鹅后台云同步留足充分时间
+            fwd_resp = await call_api(ws, fwd_action, fwd_params, timeout=25.0)
             if fwd_resp and fwd_resp.get("status") == "ok":
                 sent_via_forward = True
                 print(f"[+] 合并转发长回复下发成功！")
+            elif fwd_resp is None:
+                # 核心防重复机制：若接口仅是等待回包超时，底层 OneBot 实际上已将长文本和图包排队上云并下发
+                # 严禁再次回退发送全量原始文本，彻底杜绝聊天界面出现【合并转发 + 全量长文】的双重刷屏 Bug！
+                print(f"[*] 合并转发已提交底层协议栈处理 (等待回包超时)，标记为已接管，避免重复吐字。")
+                sent_via_forward = True
             else:
-                print(f"[-] 合并转发接口未返回成功，回退直接消息发送")
+                print(f"[-] 合并转发接口明确返回失败 ({fwd_resp.get('message')})，回退直接消息发送")
 
         if not sent_via_forward:
             out_msg = []
