@@ -21,13 +21,13 @@ from ..limiter import image_limiter
 
 # 多人互动与解剖防崩结构锚点 (Danbooru 级防肢体融化、防三只手、防脸部畸变规范)
 MULTI_PERSON_ANATOMY_ANCHORS = (
-    "CRITICAL MULTI-CHARACTER ANATOMICAL & COMPOSITION RULES: "
-    "Clean and distinct separation of the two characters. Exactly two people in frame. "
-    "Anatomically correct human anatomy: each character has exactly two arms, two hands, and five fingers per hand. "
-    "STRICTLY NO extra arms, NO extra hands, NO floating limbs, NO fused bodies, NO mutated or deformed fingers. "
-    "For kissing or intimate embrace: side profile view or clean three-quarter profile shot, "
-    "natural head tilt and angle, clear facial boundary lines, lips touching clearly without facial melting or overlapping distortion, "
-    "natural hand placement on shoulder or cheek, romantic intimate atmosphere with depth of field."
+    "CRITICAL MULTI-CHARACTER, PROPS & COMPOSITION ANCHORS: "
+    "- Distinct individual characters: clear separation between all characters, correct number of people as requested. "
+    "- Anatomical correctness: each character has strictly two arms, two hands, and exactly five fingers per hand. "
+    "- STRICTLY NO extra arms, NO extra hands, NO floating limbs, NO fused bodies, NO mutated or deformed fingers. "
+    "- SPORTS & BALL GAMES LOGIC: EXACTLY ONE BALL ONLY IN THE ENTIRE SCENE (STRICTLY NO duplicate balls, NO multiple volleyballs/footballs/basketballs). All characters must interact with the SAME single ball! "
+    "- For kissing or intimate embrace: side profile view or clean three-quarter profile shot, clear facial boundary lines, lips touching clearly without facial melting. "
+    "- Dynamic physics: realistic sand splashing, water droplets, and authentic sports interaction."
 )
 
 # 动态姿势分类库
