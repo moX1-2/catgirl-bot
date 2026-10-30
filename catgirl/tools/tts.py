@@ -106,3 +106,6 @@ async def generate_speech_minimax(
 
 # 统一别名
 generate_speech = generate_speech_minimax
+
+# 向后兼容别名
+generate_speech_gemini = generate_speech_minimax
