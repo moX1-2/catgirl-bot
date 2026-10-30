@@ -62,6 +62,9 @@ FORWARD_FOLD_LINES = int(os.getenv("FORWARD_FOLD_LINES", "6"))           # 超�
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
 MINIMAX_GROUP_ID = os.getenv("MINIMAX_GROUP_ID", "")
 MINIMAX_VOICE_ID = os.getenv("MINIMAX_VOICE_ID", "female-tianmei")  # 招牌甜美少女/猫娘音色
+MINIMAX_PITCH = int(os.getenv("MINIMAX_PITCH", "2"))               # +2 半音升调 (试听方案B锁定，元气娇俏)
+MINIMAX_SPEED = float(os.getenv("MINIMAX_SPEED", "1.08"))          # 1.08x 轻快轻灵语速 (试听方案B锁定)
+MINIMAX_EMOTION = os.getenv("MINIMAX_EMOTION", "happy")            # 元气开朗情绪特征
 
 # 2. Gemini 3.8 Flash TTS 备选引擎 (当未配置海螺 Key 时自动启用)
 GEMINI_TTS_KEY = os.getenv("GEMINI_TTS_KEY", "")

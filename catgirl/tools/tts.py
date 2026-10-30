@@ -13,7 +13,10 @@ import httpx
 from ..config import (
     MINIMAX_API_KEY,
     MINIMAX_GROUP_ID,
-    MINIMAX_VOICE_ID
+    MINIMAX_VOICE_ID,
+    MINIMAX_PITCH,
+    MINIMAX_SPEED,
+    MINIMAX_EMOTION
 )
 
 # MiniMax T2A v2 官方标准接口
@@ -62,15 +65,20 @@ async def generate_speech_minimax(
         "Content-Type": "application/json"
     }
 
+    # 智能台词剧本优化：替换生硬标点，注入自然呼吸与换气律动
+    script_text = clean_text
+    script_text = script_text.replace("...", "……").replace("！", "！ ").replace("~", "~ ")
+
     payload = {
         "model": "speech-01-turbo",
-        "text": clean_text,
+        "text": script_text,
         "stream": False,
         "voice_setting": {
             "voice_id": target_voice,
-            "speed": 1.05,
+            "speed": MINIMAX_SPEED,      # 1.08x (试听方案B锁定：轻快灵动不拖沓)
             "vol": 1.0,
-            "pitch": 0
+            "pitch": MINIMAX_PITCH,      # +2 半音 (试听方案B锁定：娇俏元气猫娘声线)
+            "emotion": MINIMAX_EMOTION   # happy (欢快情绪起伏)
         },
         "audio_setting": {
             "sample_rate": 32000,

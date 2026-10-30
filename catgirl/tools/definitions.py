@@ -47,18 +47,18 @@ SEND_VOICE_TOOL_DEFINITION = {
     "type": "function",
     "function": {
         "name": "send_voice",
-        "description": "调用海螺 AI (MiniMax 旗舰语音) 用小橘萌萌的原声说话并发送语音条给用户。适用于：用户要求语音、发语音、听你说、撒娇、唱歌、念台词，或者你想用真实声音软萌互动的情境。",
+        "description": "调用海螺 AI (MiniMax T2A v2 旗舰级拟真语音) 用阿橘的原声向用户发语音条。剧本写法秘诀：多用波浪线'~'拉长甜美元音，省略号'……'产生自然呼吸停顿，短句搭配逗号，建议 5~35 字以内，杜绝拗口长句！",
         "parameters": {
             "type": "object",
             "properties": {
                 "text": {
                     "type": "string",
-                    "description": "要用语音说出的文本内容，建议 5~40 字以内，自然可爱，适合猫娘声线表达。"
+                    "description": "要朗诵的语音台词剧本。善用拟声词（如'喵呜~'、'嘻嘻'）、波浪号'~'与省略号'……'，情感鲜活生动！"
                 },
                 "voice": {
                     "type": "string",
                     "enum": ["tianmei", "shaonv", "yujie", "boy"],
-                    "description": "音色选择。tianmei: 甜美少女/猫娘音(推荐默认); shaonv: 元气少女; yujie: 温柔御姐; boy: 活力正太。"
+                    "description": "音色选择。tianmei: 甜美少女/猫娘音(默认最推荐); shaonv: 元气活泼少女; yujie: 温柔御姐; boy: 活力少年。"
                 }
             },
             "required": ["text"]
