@@ -197,3 +197,21 @@ FETCH_WEB_PAGE_TOOL_DEFINITION = {
         }
     }
 }
+
+PLAY_MUSIC_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": "play_music",
+        "description": "【方案1：纯原生语音点歌】在酷我/网易云等全网曲库中搜索音乐并以 QQ 原生语音气泡直接向聊天中播发歌曲。当用户想要听歌、点歌、放背景音乐、或表达特定旋律时调用此工具。零卡片拦截风险，点击直接畅听整首！",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "keyword": {
+                    "type": "string",
+                    "description": "歌曲名称或'歌名 歌手'，例如 '晴天'、'起风了 买辣椒也用券'、'告白气球 周杰伦'"
+                }
+            },
+            "required": ["keyword"]
+        }
+    }
+}

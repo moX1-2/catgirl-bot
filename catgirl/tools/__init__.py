@@ -12,7 +12,8 @@ from .definitions import (
     WORKSPACE_WRITE_TOOL_DEFINITION,
     WORKSPACE_READ_TOOL_DEFINITION,
     WORKSPACE_LIST_TOOL_DEFINITION,
-    FETCH_WEB_PAGE_TOOL_DEFINITION
+    FETCH_WEB_PAGE_TOOL_DEFINITION,
+    PLAY_MUSIC_TOOL_DEFINITION
 )
 from .tavily import perform_tavily_search
 from .svg import render_svg_to_png_base64
@@ -20,6 +21,7 @@ from .image import fetch_image_as_base64
 from .tts import generate_speech, generate_speech_gemini, generate_speech_minimax
 from .paint import generate_picture_gemini
 from .fetch import fetch_web_page_content
+from .music import search_and_download_music
 
 __all__ = [
     "TAVILY_TOOL_DEFINITION",
@@ -38,5 +40,7 @@ __all__ = [
     "WORKSPACE_READ_TOOL_DEFINITION",
     "WORKSPACE_LIST_TOOL_DEFINITION",
     "FETCH_WEB_PAGE_TOOL_DEFINITION",
-    "fetch_web_page_content"
+    "fetch_web_page_content",
+    "PLAY_MUSIC_TOOL_DEFINITION",
+    "search_and_download_music"
 ]

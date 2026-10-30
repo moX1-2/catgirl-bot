@@ -15,6 +15,7 @@ from ..limiter import search_limiter, blacklist_manager
 from ..agent.history import get_active_session_count, clear_session_history
 from ..onebot.client import cached_friend_ids, ws_send
 from ..tools.tts import generate_speech
+from ..tools.music import search_and_download_music
 
 def build_help_message(is_admin: bool = False) -> str:
     """生成功能帮助与操作指引菜单"""
@@ -25,6 +26,11 @@ def build_help_message(is_admin: bool = False) -> str:
         "  · 群聊：@小橘 或包含“小橘/阿橘/猫猫/大肥鱼”触发交流",
         "  · 私聊：直接发送消息即可畅聊（陌生人保护 5条/分钟）",
         "",
+        "🎵 纯原声音乐点歌 (极简无风控语音模式)：",
+        "  · 快捷指令：/点歌 歌名 或 点歌 歌名（例如：/点歌 晴天 周杰伦）",
+        "  · 全网曲库检索并直接下发 QQ 原生语音气泡，点击直接畅听整首！",
+        "  · 对话中随时对小橘说：“放首起风了”，小橘自主调取曲库播放！",
+        "",
         "🎙️ 语音合成与表达 (海螺 AI / MiniMax 旗舰语音)：",
         "  · 对话中随时让阿橘“用语音说/发条语音/撒个娇”，自主合成发送原声语音！",
         "  · 指令：/tts 文本 或 /语音 文本（直接转语音发语音条）",
@@ -33,8 +39,9 @@ def build_help_message(is_admin: bool = False) -> str:
         "  · 发送图片、长截屏、表情包或图包，阿橘自动识图分析",
         "  · 支持穿透解析嵌套合并转发图包与多层回复引用！",
         "",
-        "🎨 SVG 绘图与渲染：",
-        "  · 让阿橘画架构图、流程图、对比图或猫猫插图，自动渲染为高清图片发送！",
+        "🎨 双引擎绘图与渲染：",
+        "  · 方案A：SVG 矢量制图（流程图、架构图、卡片图表）",
+        "  · 方案B：gemini-3.1-flash-image 并发双候选自检比选 AI 生图",
         "",
         "🌐 实时联网检索：",
         "  · 询问最新时事、今日天气、技术热点时自主调用 Tavily 搜索（带流量保护）",
@@ -129,8 +136,9 @@ async def handle_admin_or_help(
             }
         await ws_send(ws, payload)
 
-    async def send_voice_reply(b64_audio: str):
-        out_msg = [{"type": "record", "data": {"file": f"base64://{b64_audio}"}}]
+    async def send_voice_reply(audio_src: str):
+        file_val = audio_src if (audio_src.startswith("/") or audio_src.startswith("http")) else f"base64://{audio_src}"
+        out_msg = [{"type": "record", "data": {"file": file_val}}]
         if msg_type == "group":
             payload = {
                 "action": "send_group_msg",
@@ -148,7 +156,23 @@ async def handle_admin_or_help(
         await send_reply(build_help_message(is_admin=is_admin))
         return True
 
-    # 2. 快捷语音合成直发指令 (/tts 或 /语音)
+    # 2. 快捷点歌指令 (0 Token 极速直发纯语音气泡)
+    if cmd.startswith(("/点歌", "点歌", "/music", "music ", "/song", "song ")):
+        parts = re.split(r"\s+", cmd, maxsplit=1)
+        if len(parts) > 1 and parts[1].strip():
+            song_kw = parts[1].strip()
+            print(f"[*] 收到直接点歌指令: {song_kw}")
+            await send_reply(f"正在为主人抓取《{song_kw}》的原声音频喵，稍等片刻~ 🐾🎶")
+            local_path, meta, err = await search_and_download_music(song_kw)
+            if local_path:
+                await send_voice_reply(local_path)
+            else:
+                await send_reply(f"喵呜~ 未能在曲库中找到《{song_kw}》的可用音源喵: {err}")
+        else:
+            await send_reply("请提供要点的歌曲名称喵，例如：/点歌 晴天 周杰伦 🐾")
+        return True
+
+    # 3. 快捷语音合成直发指令 (/tts 或 /语音)
     if cmd.startswith(("/tts", "/语音", "tts ", "语音 ")):
         parts = re.split(r"\s+", cmd, maxsplit=1)
         if len(parts) > 1 and parts[1].strip():

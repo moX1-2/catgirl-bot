@@ -328,12 +328,20 @@ async def process_message_event(ws, event: Dict[str, Any]):
             await ws_send(ws, payload)
 
     if gen_voice:
-        print(f"[+] 正在向 QQ 下发生成的 Despina 导演语音气泡 (Base64 大小: {len(gen_voice)})")
+        # 兼容本地音频文件路径(如点歌MP3)与纯 Base64 编码(如海螺TTS)
+        import os
+        if isinstance(gen_voice, str) and (gen_voice.startswith("/") or os.path.exists(gen_voice)):
+            audio_file_uri = gen_voice
+            print(f"[+] 正在向 QQ 下发点歌原声音频语音气泡: {audio_file_uri}")
+        else:
+            audio_file_uri = f"base64://{gen_voice}"
+            print(f"[+] 正在向 QQ 下发海螺 AI 原声语音气泡 (大小: {len(gen_voice)})")
+
         voice_payload = {
             "action": "send_group_msg" if msg_type == "group" else "send_private_msg",
             "params": {
                 ("group_id" if msg_type == "group" else "user_id"): (group_id if msg_type == "group" else user_id),
-                "message": [{"type": "record", "data": {"file": f"base64://{gen_voice}"}}]
+                "message": [{"type": "record", "data": {"file": audio_file_uri}}]
             }
         }
         await asyncio.sleep(0.3)
