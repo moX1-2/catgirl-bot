@@ -68,7 +68,8 @@ async def process_message_event(ws, event: Dict[str, Any]):
     raw_text = event.get("raw_message", "").strip()
     sender = event.get("sender", {}).get("card") or event.get("sender", {}).get("nickname") or "群友"
 
-    text_parts = []
+    typed_text_parts = []     # 用户真实输入的纯文字 (用于唤醒词与指令判定)
+    context_text_parts = []   # 包含表情包摘要与面部表情的语义上下文 (供模型理解)
     image_urls = []
     forward_ids = []
     reply_ids = []
@@ -79,17 +80,21 @@ async def process_message_event(ws, event: Dict[str, Any]):
             seg_type = seg.get("type")
             seg_data = seg.get("data", {}) or {}
             if seg_type == "text":
-                text_parts.append(seg_data.get("text", ""))
+                t = seg_data.get("text", "")
+                typed_text_parts.append(t)
+                context_text_parts.append(t)
             elif seg_type == "face":
                 fid = str(seg_data.get("id", ""))
-                text_parts.append(decode_qq_face(fid))
+                decoded_face = decode_qq_face(fid)
+                context_text_parts.append(decoded_face)
             elif seg_type in ["image", "mface", "marketface", "bface"]:
                 url = seg_data.get("url") or ""
                 file_v = seg_data.get("file") or ""
                 summary = seg_data.get("summary") or seg_data.get("text") or ""
+                # 严禁将图片自带的 summary (如 QQ 自动标注的 "喵喵"、"猫猫") 混入 typed_text！
                 if summary:
                     clean_s = summary.strip().strip("[]")
-                    if clean_s: text_parts.append(f"[{clean_s}]")
+                    if clean_s: context_text_parts.append(f"[{clean_s}]")
                 if isinstance(url, str) and url.startswith("http"):
                     clean_u = html.unescape(url).strip()
                     if clean_u not in image_urls: image_urls.append(clean_u)
@@ -138,9 +143,15 @@ async def process_message_event(ws, event: Dict[str, Any]):
         for m in re.finditer(r"\[CQ:reply,id=([^,\]]+)\]", raw_text):
             reply_ids.append(m.group(1))
 
-    user_text = "".join(text_parts).strip()
-    if not user_text and raw_text:
-        user_text = re.sub(r"\[CQ:[^]]+\]", "", raw_text).strip()
+    # typed_text: 严格仅限用户敲键盘打出来的文字，杜绝一切图片 summary 伪造唤醒！
+    typed_text = "".join(typed_text_parts).strip()
+    if not typed_text and raw_text:
+        typed_text = re.sub(r"\[CQ:[^]]+\]", "", raw_text).strip()
+
+    # user_text: 传递给模型上下文的完整说明
+    user_text = "".join(context_text_parts).strip()
+    if not user_text:
+        user_text = typed_text
 
     group_id = event.get("group_id")
 
@@ -164,13 +175,13 @@ async def process_message_event(ws, event: Dict[str, Any]):
         if not is_at and raw_text and f"[CQ:at,qq={BOT_QQ}]" in raw_text:
             is_at = True
 
-        # 1. 专属名字唤醒词：100% 触发响应
+        # 1. 专属名字唤醒词：严格根据用户真实敲字 (typed_text) 判定，杜绝图片 summary 误触发！
         direct_keywords = ["小橘", "阿橘", "橘宝", "猫猫", "喵喵"]
-        has_direct_keyword = any(kw in user_text for kw in direct_keywords)
+        has_direct_keyword = any(kw in typed_text for kw in direct_keywords)
 
-        # 2. 「鱼」关键词概率唤醒：投掷 0~1 随机数，仅 30% 概率触发
+        # 2. 「鱼」关键词概率唤醒：严格根据真实打字判定
         fish_triggered = False
-        if "鱼" in user_text and not has_direct_keyword and not is_at:
+        if "鱼" in typed_text and not has_direct_keyword and not is_at:
             roll = random.random()
             if roll < FISH_TRIGGER_PROBABILITY:
                 fish_triggered = True
