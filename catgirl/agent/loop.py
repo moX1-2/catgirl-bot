@@ -29,6 +29,7 @@ from ..tools.definitions import (
     WORKSPACE_READ_TOOL_DEFINITION,
     WORKSPACE_LIST_TOOL_DEFINITION,
     FETCH_WEB_PAGE_TOOL_DEFINITION,
+    SEARCH_MUSIC_CANDIDATES_TOOL_DEFINITION,
     PLAY_MUSIC_TOOL_DEFINITION
 )
 from ..tools.tavily import perform_tavily_search
@@ -36,7 +37,7 @@ from ..tools.svg import render_svg_to_png_base64
 from ..tools.tts import generate_speech
 from ..tools.paint import generate_picture_gemini
 from ..tools.fetch import fetch_web_page_content
-from ..tools.music import search_and_download_music
+from ..tools.music import search_and_download_music, search_candidates_tool
 from ..workspace import workspace_manager
 from ..tools.image import fetch_image_as_base64
 
@@ -47,6 +48,7 @@ ALL_AGENT_TOOLS = [
     DRAW_SVG_TOOL_DEFINITION,
     GENERATE_IMAGE_TOOL_DEFINITION,
     SEND_VOICE_TOOL_DEFINITION,
+    SEARCH_MUSIC_CANDIDATES_TOOL_DEFINITION,
     PLAY_MUSIC_TOOL_DEFINITION,
     WORKSPACE_RUN_TOOL_DEFINITION,
     WORKSPACE_WRITE_TOOL_DEFINITION,
@@ -186,23 +188,35 @@ async def ask_llm(
                     print(f"[*] 执行网页深度抓取与阅读 (轮次 {step+1}): {w_url[:60]}")
                     page_content = await fetch_web_page_content(w_url)
                     messages_to_send.append({"role": "tool", "tool_call_id": tc.id, "content": page_content})
+                elif fn_name == "search_music_candidates":
+                    s_kw = args.get("keyword", "") if isinstance(args, dict) else str(args)
+                    print(f"[*] 执行曲库多候选透视检索与副歌起唱探测 (轮次 {step+1}): {s_kw}")
+                    cands_text = await search_candidates_tool(s_kw, limit=5)
+                    messages_to_send.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": cands_text
+                    })
                 elif fn_name == "play_music":
-                    m_kw = args.get("keyword", "") if isinstance(args, dict) else str(args)
-                    print(f"[*] 执行点歌曲库检索与下载 (轮次 {step+1}): {m_kw}")
-                    m_path, m_meta, m_err = await search_and_download_music(m_kw)
+                    m_kw = args.get("keyword", "") if isinstance(args, dict) else ""
+                    m_id = args.get("music_id", "") if isinstance(args, dict) else ""
+                    if not m_kw and not m_id and not isinstance(args, dict):
+                        m_kw = str(args)
+                    print(f"[*] 执行点歌高清母带下载与下发 (轮次 {step+1}): id={m_id}, kw={m_kw}")
+                    m_path, m_meta, m_err = await search_and_download_music(keyword=m_kw, music_id=m_id)
                     if m_path:
                         generated_voice_b64 = m_path
-                        title_info = f"《{m_meta.get('title', m_kw)}》 - {m_meta.get('artist', '')}" if m_meta else m_kw
+                        title_info = f"《{m_meta.get('title', m_kw)}》 - {m_meta.get('artist', '')}" if m_meta else (m_kw or m_id)
                         messages_to_send.append({
                             "role": "tool",
                             "tool_call_id": tc.id,
-                            "content": f"已成功检索并下载 {title_info} 的原声音频，已挂载为原生语音气泡直接发给用户喵！"
+                            "content": f"已成功锁定并下载 {title_info} 的高清母带音频，已挂载为原生语音气泡直接发给用户喵！请在回复中明确告知用户已为其播放此版本。"
                         })
                     else:
                         messages_to_send.append({
                             "role": "tool",
                             "tool_call_id": tc.id,
-                            "content": f"未能在曲库中找到与《{m_kw}》匹配的可用音源: {m_err}"
+                            "content": f"未能下载该版本的可用音源: {m_err}"
                         })
                 elif fn_name == "generate_image":
                     p_prompt = args.get("prompt", "")

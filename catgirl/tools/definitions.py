@@ -198,20 +198,41 @@ FETCH_WEB_PAGE_TOOL_DEFINITION = {
     }
 }
 
-PLAY_MUSIC_TOOL_DEFINITION = {
+SEARCH_MUSIC_CANDIDATES_TOOL_DEFINITION = {
     "type": "function",
     "function": {
-        "name": "play_music",
-        "description": "【方案1：纯原生语音点歌】在酷我/网易云等全网曲库中搜索音乐并以 QQ 原生语音气泡直接向聊天中播发歌曲。当用户想要听歌、点歌、放背景音乐、或表达特定旋律时调用此工具。零卡片拦截风险，点击直接畅听整首！",
+        "name": "search_music_candidates",
+        "description": "【点歌前多候选透视与副歌起唱探测】在曲库中检索多个版本的候选歌曲清单。返回各候选版本的名称（含DJ/卡点/副歌等标签）、歌手、时长与副歌开唱时间（是否0秒开门见山直接唱副歌）。当用户对歌曲有特定版本要求（如DJ版、直接唱副歌那版、Live版、特定翻唱）时必须先调用此工具查看候选，选中心仪版本后调用 play_music(music_id=...) 精准播发！",
         "parameters": {
             "type": "object",
             "properties": {
                 "keyword": {
                     "type": "string",
-                    "description": "歌曲名称或'歌名 歌手'，例如 '晴天'、'起风了 买辣椒也用券'、'告白气球 周杰伦'"
+                    "description": "要检索的歌曲名或核心关键词，例如 '心墙 DJ'、'晴天'、'告白气球'"
                 }
             },
             "required": ["keyword"]
+        }
+    }
+}
+
+PLAY_MUSIC_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": "play_music",
+        "description": "【纯原生语音点歌下发】以 QQ 原生语音气泡直接向聊天中播发高清母带音频。支持传入 search_music_candidates 挑选出的 music_id 精准播发，也支持直接传入 keyword 模糊播发。零卡片拦截风险，点击直接畅听整首！",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "music_id": {
+                    "type": "string",
+                    "description": "通过 search_music_candidates 确认的特定版本编号ID，如 '142705065'。提供时将精准播发该特定版本！"
+                },
+                "keyword": {
+                    "type": "string",
+                    "description": "歌曲名称或'歌名 歌手'，例如 '晴天'、'心墙 (DJ卡点版)'"
+                }
+            }
         }
     }
 }
