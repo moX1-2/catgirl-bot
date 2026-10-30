@@ -32,7 +32,7 @@ from ..tools.definitions import (
 )
 from ..tools.tavily import perform_tavily_search
 from ..tools.svg import render_svg_to_png_base64
-from ..tools.tts import generate_speech_gemini
+from ..tools.tts import generate_speech
 from ..tools.paint import generate_picture_gemini
 from ..tools.fetch import fetch_web_page_content
 from ..workspace import workspace_manager
@@ -162,9 +162,9 @@ async def ask_llm(
                     })
                 elif fn_name == "send_voice":
                     v_text = args.get("text", "")
-                    v_voice = args.get("voice", "Despina")
-                    print(f"[*] 执行 Gemini 3.8 TTS 语音合成 (轮次 {step+1}): {v_text[:30]} ({v_voice})")
-                    v_b64, v_err = await generate_speech_gemini(v_text, voice_name=v_voice)
+                    v_voice = args.get("voice", "tianmei")
+                    print(f"[*] 执行海螺 AI (MiniMax) 语音合成 (轮次 {step+1}): {v_text[:30]} ({v_voice})")
+                    v_b64, v_err = await generate_speech(v_text, voice_name=v_voice)
                     if v_b64:
                         generated_voice_b64 = v_b64
                         messages_to_send.append({

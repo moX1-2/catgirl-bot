@@ -14,7 +14,7 @@ from ..config import MODEL_NAME, TAVILY_KEYS, ADMIN_QQ
 from ..limiter import search_limiter, blacklist_manager
 from ..agent.history import get_active_session_count, clear_session_history
 from ..onebot.client import cached_friend_ids, ws_send
-from ..tools.tts import generate_speech_gemini
+from ..tools.tts import generate_speech
 
 def build_help_message(is_admin: bool = False) -> str:
     """生成功能帮助与操作指引菜单"""
@@ -25,7 +25,7 @@ def build_help_message(is_admin: bool = False) -> str:
         "  · 群聊：@小橘 或包含“小橘/阿橘/猫猫/大肥鱼”触发交流",
         "  · 私聊：直接发送消息即可畅聊（陌生人保护 5条/分钟）",
         "",
-        "🎙️ 语音合成与表达 (Gemini 3.8 TTS)：",
+        "🎙️ 语音合成与表达 (海螺 AI / MiniMax 旗舰语音)：",
         "  · 对话中随时让阿橘“用语音说/发条语音/撒个娇”，自主合成发送原声语音！",
         "  · 指令：/tts 文本 或 /语音 文本（直接转语音发语音条）",
         "",
@@ -154,7 +154,7 @@ async def handle_admin_or_help(
         if len(parts) > 1 and parts[1].strip():
             text_to_speak = parts[1].strip()
             print(f"[*] 收到直接语音生成指令: {text_to_speak[:30]}")
-            b64_audio, err = await generate_speech_gemini(text_to_speak)
+            b64_audio, err = await generate_speech(text_to_speak)
             if b64_audio:
                 await send_voice_reply(b64_audio)
             else:

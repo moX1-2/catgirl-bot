@@ -57,9 +57,15 @@ FORWARD_FOLD_ENABLED = os.getenv("FORWARD_FOLD_ENABLED", "true").lower() in ("tr
 FORWARD_FOLD_THRESHOLD = int(os.getenv("FORWARD_FOLD_THRESHOLD", "260"))  # 超过260字自动收起
 FORWARD_FOLD_LINES = int(os.getenv("FORWARD_FOLD_LINES", "6"))           # 超过6行自动收起
 
-# Gemini 3.8 Flash TTS 语音合成密钥与音调系数
+# 语音合成 (TTS) 双引擎配置 (支持 海螺/MiniMax 旗舰语音 与 Gemini 3.8 Flash TTS 自动无缝降级)
+# 1. 海螺 AI / MiniMax 语音配置 (前往 platform.minimaxi.com 免费注册获取，音色极佳)
+MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
+MINIMAX_GROUP_ID = os.getenv("MINIMAX_GROUP_ID", "")
+MINIMAX_VOICE_ID = os.getenv("MINIMAX_VOICE_ID", "female-tianmei")  # 招牌甜美少女/猫娘音色
+
+# 2. Gemini 3.8 Flash TTS 备选引擎 (当未配置海螺 Key 时自动启用)
 GEMINI_TTS_KEY = os.getenv("GEMINI_TTS_KEY", "")
-TTS_PITCH_FACTOR = float(os.getenv("TTS_PITCH_FACTOR", "1.15"))  # 默认 1.15x 升调，达到最佳自然猫娘萌化效果
+TTS_PITCH_FACTOR = float(os.getenv("TTS_PITCH_FACTOR", "1.15"))
 
 # Tavily 搜索密钥池 (支持逗号分隔多个 Key 自动故障转移)
 _tavily_raw = os.getenv("TAVILY_KEYS", "")

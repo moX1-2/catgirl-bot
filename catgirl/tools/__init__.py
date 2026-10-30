@@ -17,7 +17,7 @@ from .definitions import (
 from .tavily import perform_tavily_search
 from .svg import render_svg_to_png_base64
 from .image import fetch_image_as_base64
-from .tts import generate_speech_gemini
+from .tts import generate_speech, generate_speech_gemini, generate_speech_minimax
 from .paint import generate_picture_gemini
 from .fetch import fetch_web_page_content
 
@@ -29,7 +29,9 @@ __all__ = [
     "perform_tavily_search",
     "render_svg_to_png_base64",
     "fetch_image_as_base64",
+    "generate_speech",
     "generate_speech_gemini",
+    "generate_speech_minimax",
     "generate_picture_gemini",
     "WORKSPACE_RUN_TOOL_DEFINITION",
     "WORKSPACE_WRITE_TOOL_DEFINITION",
