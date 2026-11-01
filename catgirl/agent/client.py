@@ -10,7 +10,7 @@ import json
 import base64
 import html
 import asyncio
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 import httpx
 from openai import AsyncOpenAI
