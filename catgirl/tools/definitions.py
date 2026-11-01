@@ -236,3 +236,25 @@ PLAY_MUSIC_TOOL_DEFINITION = {
         }
     }
 }
+
+ANALYZE_BILIBILI_VIDEO_TOOL_DEFINITION = {
+    "type": "function",
+    "function": {
+        "name": "analyze_bilibili_video",
+        "description": "【B站视频多模态逐秒视觉深度解析】输入 B 站视频链接（包含 BV号、av号、bilibili.com/video/ 或 b23.tv 短链），由系统自动获取音画视频流并通过轻量化抽帧瘦身，交由大模型逐秒视觉审阅，输出包含精确时间轴、画面分镜、剧情细节与生动观后感的专业深度长文解析。当用户发送 B 站视频链接并要求看视频、总结视频、分析视频内容时调用此工具。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "B站视频链接或BV号，如 'https://www.bilibili.com/video/BV1QF4m1M7Vd' 或 'b23.tv/xxx' 或 'BV1QF4m1M7Vd'"
+                },
+                "focus_prompt": {
+                    "type": "string",
+                    "description": "用户特别关心的分析侧重点（可选，如：'重点看结尾彩蛋'、'分析剧情反转'、'提取画面中的排行榜'）"
+                }
+            },
+            "required": ["url"]
+        }
+    }
+}

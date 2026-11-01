@@ -35,6 +35,7 @@ IMAGE_GEN_MAX_PER_MINUTE = int(os.getenv("IMAGE_GEN_MAX_PER_MINUTE", "8"))  # 1�
 IMAGE_GEN_CANDIDATES = int(os.getenv("IMAGE_GEN_CANDIDATES", "2"))        # 每次并发生成 2 张候选图供视觉自检比选
 LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "60.0"))  # 异步请求超时时间 (秒)
 LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "1"))
+LLM_PROTOCOL = os.getenv("LLM_PROTOCOL", "google").lower()  # "google" (推荐: 支持原生视频/原生音频/思维链) | "openai" (通用兼容)
 
 # QQ 与 OneBot 11 协议配置
 BOT_QQ = os.getenv("BOT_QQ", "")

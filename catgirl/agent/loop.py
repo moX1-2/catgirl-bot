@@ -30,7 +30,8 @@ from ..tools.definitions import (
     WORKSPACE_LIST_TOOL_DEFINITION,
     FETCH_WEB_PAGE_TOOL_DEFINITION,
     SEARCH_MUSIC_CANDIDATES_TOOL_DEFINITION,
-    PLAY_MUSIC_TOOL_DEFINITION
+    PLAY_MUSIC_TOOL_DEFINITION,
+    ANALYZE_BILIBILI_VIDEO_TOOL_DEFINITION
 )
 from ..tools.tavily import perform_tavily_search
 from ..tools.svg import render_svg_to_png_base64
@@ -38,6 +39,7 @@ from ..tools.tts import generate_speech
 from ..tools.paint import generate_picture_gemini
 from ..tools.fetch import fetch_web_page_content
 from ..tools.music import search_and_download_music, search_candidates_tool
+from ..tools.video import analyze_bilibili_video
 from ..workspace import workspace_manager
 from ..tools.image import fetch_image_as_base64
 
@@ -45,6 +47,7 @@ from ..tools.image import fetch_image_as_base64
 ALL_AGENT_TOOLS = [
     TAVILY_TOOL_DEFINITION,
     FETCH_WEB_PAGE_TOOL_DEFINITION,
+    ANALYZE_BILIBILI_VIDEO_TOOL_DEFINITION,
     DRAW_SVG_TOOL_DEFINITION,
     GENERATE_IMAGE_TOOL_DEFINITION,
     SEND_VOICE_TOOL_DEFINITION,
@@ -196,6 +199,16 @@ async def ask_llm(
                         "role": "tool",
                         "tool_call_id": tc.id,
                         "content": cands_text
+                    })
+                elif fn_name == "analyze_bilibili_video":
+                    v_url = args.get("url", "") if isinstance(args, dict) else str(args)
+                    v_focus = args.get("focus_prompt", "") if isinstance(args, dict) else None
+                    print(f"[*] 执行 B站 视频多模态逐秒视觉深度解析 (轮次 {step+1}): {v_url}")
+                    v_res = await analyze_bilibili_video(v_url, focus_prompt=v_focus)
+                    messages_to_send.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": v_res
                     })
                 elif fn_name == "play_music":
                     m_kw = args.get("keyword", "") if isinstance(args, dict) else ""

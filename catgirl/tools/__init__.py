@@ -14,7 +14,8 @@ from .definitions import (
     WORKSPACE_LIST_TOOL_DEFINITION,
     FETCH_WEB_PAGE_TOOL_DEFINITION,
     SEARCH_MUSIC_CANDIDATES_TOOL_DEFINITION,
-    PLAY_MUSIC_TOOL_DEFINITION
+    PLAY_MUSIC_TOOL_DEFINITION,
+    ANALYZE_BILIBILI_VIDEO_TOOL_DEFINITION
 )
 from .tavily import perform_tavily_search
 from .svg import render_svg_to_png_base64
@@ -23,6 +24,7 @@ from .tts import generate_speech, generate_speech_gemini, generate_speech_minima
 from .paint import generate_picture_gemini
 from .fetch import fetch_web_page_content
 from .music import search_and_download_music, search_candidates_tool
+from .video import analyze_bilibili_video
 
 __all__ = [
     "TAVILY_TOOL_DEFINITION",
@@ -45,5 +47,7 @@ __all__ = [
     "SEARCH_MUSIC_CANDIDATES_TOOL_DEFINITION",
     "PLAY_MUSIC_TOOL_DEFINITION",
     "search_and_download_music",
-    "search_candidates_tool"
+    "search_candidates_tool",
+    "ANALYZE_BILIBILI_VIDEO_TOOL_DEFINITION",
+    "analyze_bilibili_video"
 ]
