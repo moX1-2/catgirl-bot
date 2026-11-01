@@ -84,20 +84,25 @@ async def ask_llm(
     else:
         prompt_text = current_text
 
-    # 多模态图片直接透传 (支持直接 HTTP/HTTPS URL 与 Base64 混合输入)
+    # 多模态图片全量预加载与 Base64 高保真优化 (双协议通吃，彻底消灭'多媒体直链看不了'Bug)
     valid_images = []
     if image_urls:
         target_urls = image_urls[:MAX_IMAGES_PER_TURN]
         for u in target_urls:
             clean_u = html.unescape(u).strip()
-            if clean_u.startswith("http://") or clean_u.startswith("https://") or clean_u.startswith("data:image"):
+            if clean_u.startswith("data:image"):
                 valid_images.append(clean_u)
             else:
-                # 若为本地文件或特殊路径，通过 base64 转换兜底
+                # 无论是 HTTP/HTTPS 链接、QQ 图床直链还是本地路径，一律经由 fetch_image_as_base64 处理：
+                # 1. 自动利用 Pillow 智能缩放压缩 (长图/表情包无损适配)，避免大图打爆带宽与内存
+                # 2. 携带 QQ 空间防盗链请求头下载
+                # 3. 产出标准的 data:image/jpeg;base64，Google 原生 inline_data 与 OpenAI 双协议 100% 完美解析！
                 b64 = await fetch_image_as_base64(clean_u)
                 if b64:
                     valid_images.append(b64)
-        print(f"[*] 成功装载多模态视觉输入: {len(valid_images)} / {len(target_urls)} 张 (直接传图)")
+                elif clean_u.startswith("http"):
+                    valid_images.append(clean_u)
+        print(f"[*] 成功装载多模态视觉输入: {len(valid_images)} / {len(target_urls)} 张 (全量高保真 Base64)")
 
     if valid_images:
         content_parts = [{"type": "text", "text": prompt_text}]

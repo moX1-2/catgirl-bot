@@ -91,9 +91,10 @@ def _convert_tools_to_google(tools: Optional[List[Dict[str, Any]]]) -> Optional[
     return [{"functionDeclarations": declarations}] if declarations else None
 
 
-def _convert_messages_to_google(messages: List[Any]) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+async def _convert_messages_to_google(messages: List[Any]) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     将 OpenAI 格式的消息列表转换为 Google Generative Language 原生结构:
+    支持自动下载与转换 HTTP/HTTPS 图片为 inline_data (解决'图片直链肉眼看不了'Bug)
     返回 (system_instruction, contents)
     """
     system_parts = []
@@ -156,8 +157,24 @@ def _convert_messages_to_google(messages: List[Any]) -> Tuple[Optional[Dict[str,
                                 }
                             })
                         elif url_val.startswith("http"):
-                            # 纯 HTTP 图片
-                            user_parts.append({"text": f"[图片直链]: {url_val}"})
+                            # 核心修复：纯 HTTP 图片自动经由 fetch_image_as_base64 异步下载并转为 inline_data!
+                            try:
+                                from ..tools.image import fetch_image_as_base64
+                                b64 = await fetch_image_as_base64(url_val)
+                                if b64 and b64.startswith("data:"):
+                                    header, b64_data = b64.split(",", 1)
+                                    mime = header.split(";")[0].replace("data:", "").strip()
+                                    user_parts.append({
+                                        "inline_data": {
+                                            "mime_type": mime,
+                                            "data": b64_data
+                                        }
+                                    })
+                                else:
+                                    user_parts.append({"text": f"[图片直链]: {url_val}"})
+                            except Exception as e_dl:
+                                print(f"[-] 转换 HTTP 图片为 inline_data 失败: {e_dl}")
+                                user_parts.append({"text": f"[图片直链]: {url_val}"})
                     elif p_type == "video_data":
                         # 原生视频直传
                         user_parts.append({
@@ -240,7 +257,7 @@ class GoogleCompletionsAdapter:
         temperature: float = 0.85,
         **kwargs
     ) -> UnifiedResponse:
-        system_instruction, contents = _convert_messages_to_google(messages)
+        system_instruction, contents = await _convert_messages_to_google(messages)
         google_tools = _convert_tools_to_google(tools)
 
         payload: Dict[str, Any] = {"contents": contents}
