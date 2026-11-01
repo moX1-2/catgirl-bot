@@ -153,13 +153,13 @@ async def get_forward_content(ws, forward_id, depth=0, max_depth=3):
 
         for m in nodes[:25]:
             s_name = (m.get("sender") or {}).get("card") or (m.get("sender") or {}).get("nickname") or "某人"
-            msg_body = m.get("message")
+            msg_body = m.get("message") or m.get("content")
             m_raw = m.get("raw_message", "")
 
             node_imgs = []
             node_texts = []
 
-            # 1. 结构化 message 数组解析
+            # 1. 结构化 message / content 数组解析
             if isinstance(msg_body, list):
                 for s in msg_body:
                     if not isinstance(s, dict): continue
@@ -190,7 +190,9 @@ async def get_forward_content(ws, forward_id, depth=0, max_depth=3):
                         if isinstance(sub_content, list) and sub_content:
                             await parse_node_list(sub_content, sub_depth + 1)
                         elif sd.get("id"):
-                            _, sub_imgs = await get_forward_content(ws, sd["id"], sub_depth + 1, max_depth)
+                            sub_txt, sub_imgs = await get_forward_content(ws, sd["id"], sub_depth + 1, max_depth)
+                            if sub_txt:
+                                node_texts.append(sub_txt)
                             node_imgs.extend(sub_imgs)
 
                     elif st == "node":
@@ -202,7 +204,12 @@ async def get_forward_content(ws, forward_id, depth=0, max_depth=3):
                         t = sd.get("text", "").strip()
                         if t: node_texts.append(t)
 
-            # 2. CQ 码兜底 (提取内嵌 forward 与 image)
+            # 2. CQ 码兜底与纯文本兜底
+            if not node_texts and m_raw:
+                clean_raw = re.sub(r"\[CQ:[^]]+\]", "", m_raw).strip()
+                if clean_raw:
+                    node_texts.append(clean_raw)
+
             if m_raw:
                 for match in re.finditer(r"\[CQ:(?:image|mface|marketface)[^]]*url=([^,\]]+)", m_raw):
                     clean_u = html.unescape(match.group(1)).strip()
@@ -211,7 +218,9 @@ async def get_forward_content(ws, forward_id, depth=0, max_depth=3):
                 for match in re.finditer(r"\[CQ:forward,id=([^,\]]+)\]", m_raw):
                     nested_fid = match.group(1).strip()
                     if nested_fid != str(forward_id):
-                        _, sub_imgs = await get_forward_content(ws, nested_fid, sub_depth + 1, max_depth)
+                        sub_txt, sub_imgs = await get_forward_content(ws, nested_fid, sub_depth + 1, max_depth)
+                        if sub_txt:
+                            node_texts.append(sub_txt)
                         for u in sub_imgs:
                             if u not in node_imgs: node_imgs.append(u)
 
@@ -229,12 +238,12 @@ async def get_forward_content(ws, forward_id, depth=0, max_depth=3):
                 lines.append(f"{s_name}: {txt}")
 
     await parse_node_list(messages, depth)
-    summary_header = "【嵌套合并转发图包内容】:" if depth > 0 else "【合并转发内容】:"
+    summary_header = "【嵌套合并转发内容】:" if depth > 0 else "【合并转发内容】:"
     return summary_header + "\n" + "\n".join(lines[:25]), forward_images
 
 async def get_msg_content(ws, msg_id):
     """
-    获取单条消息内容并提取图片与嵌套合并转发
+    获取单条被引用消息的内容并完整提取文本、图片与嵌套合并转发
     """
     resp = await call_api(ws, "get_msg", {"message_id": msg_id})
     if not resp or resp.get("status") != "ok": return "", []
@@ -242,6 +251,10 @@ async def get_msg_content(ws, msg_id):
     message_content = data.get("message", [])
     raw_str = data.get("raw_message", "")
     sub_imgs = []
+    forward_texts = []
+
+    sender_info = data.get("sender", {}) or {}
+    orig_sender = sender_info.get("card") or sender_info.get("nickname") or ""
 
     if isinstance(message_content, list):
         for s in message_content:
@@ -263,8 +276,25 @@ async def get_msg_content(ws, msg_id):
                         pass
             elif st == "forward":
                 fid = sd.get("id")
-                if fid:
-                    _, f_imgs = await get_forward_content(ws, fid)
+                sub_content = sd.get("content")
+                if isinstance(sub_content, list) and sub_content:
+                    f_lines = []
+                    for m in sub_content[:25]:
+                        s_name = (m.get("sender") or {}).get("card") or (m.get("sender") or {}).get("nickname") or "某人"
+                        m_msg = m.get("message") or m.get("content")
+                        m_txt = ""
+                        if isinstance(m_msg, list):
+                            m_txt = extract_text_from_segments(m_msg)
+                        if not m_txt and m.get("raw_message"):
+                            m_txt = re.sub(r"\[CQ:[^]]+\]", "", m["raw_message"]).strip()
+                        if m_txt:
+                            f_lines.append(f"{s_name}: {m_txt}")
+                    if f_lines:
+                        forward_texts.append("【合并转发聊天记录】:\n" + "\n".join(f_lines[:25]))
+                elif fid:
+                    f_txt, f_imgs = await get_forward_content(ws, fid)
+                    if f_txt:
+                        forward_texts.append(f_txt)
                     sub_imgs.extend(f_imgs)
 
     if raw_str:
@@ -272,7 +302,9 @@ async def get_msg_content(ws, msg_id):
             sub_imgs.append(html.unescape(m.group(1)).strip())
         for m in re.finditer(r"\[CQ:forward,id=([^,\]]+)\]", raw_str):
             fid = m.group(1).strip()
-            _, f_imgs = await get_forward_content(ws, fid)
+            f_txt, f_imgs = await get_forward_content(ws, fid)
+            if f_txt and f_txt not in forward_texts:
+                forward_texts.append(f_txt)
             sub_imgs.extend(f_imgs)
 
     dedup_imgs = list(dict.fromkeys(sub_imgs))
@@ -281,4 +313,17 @@ async def get_msg_content(ws, msg_id):
         text = extract_text_from_segments(message_content)
     if not text and raw_str:
         text = re.sub(r"\[CQ:[^]]+\]", "", raw_str).strip()
-    return text, dedup_imgs
+
+    combined_lines = []
+    if orig_sender and text:
+        combined_lines.append(f"{orig_sender} 说: {text}")
+    elif text:
+        combined_lines.append(text)
+
+    if forward_texts:
+        if orig_sender and not text:
+            combined_lines.append(f"【{orig_sender} 转发的聊天记录】:")
+        combined_lines.extend(forward_texts)
+
+    final_text = "\n".join(combined_lines).strip()
+    return final_text, dedup_imgs
