@@ -22,7 +22,11 @@ async def _fetch_single_candidate(user_parts, variation_tag: str, timeout: float
     elif isinstance(parts, str):
         parts = parts + f"\nCamera & Composition Variation: {variation_tag}"
 
-    url = f"{BASE_URL.rstrip('/')}/chat/completions"
+    clean_base = BASE_URL.rstrip('/')
+    if clean_base.endswith("/v1"):
+        url = f"{clean_base}/chat/completions"
+    else:
+        url = f"{clean_base}/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json",

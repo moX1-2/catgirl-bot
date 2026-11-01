@@ -56,6 +56,18 @@ def extract_bvid_from_url(text: str) -> Optional[str]:
         except Exception as e:
             print(f"[-] 解析 b23 短链重定向失败: {e}")
 
+    # 匹配传统 av 号并自动转换
+    m_av = re.search(r"av(\d+)", raw, re.I)
+    if m_av:
+        aid = m_av.group(1)
+        try:
+            view_url = os.getenv("BILIBILI_VIEW_URL", "https://api.bilibili.com/x/web-interface/view")
+            r_av = requests.get(f"{view_url}?aid={aid}", timeout=5).json()
+            if r_av.get("code") == 0 and r_av.get("data", {}).get("bvid"):
+                return r_av["data"]["bvid"]
+        except Exception:
+            pass
+
     return None
 
 

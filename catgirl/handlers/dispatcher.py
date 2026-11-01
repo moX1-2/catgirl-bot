@@ -122,7 +122,7 @@ async def process_message_event(ws, event: Dict[str, Any]):
     # 提取 CQ 码兜底
     if raw_text:
         for m in re.finditer(r"\[CQ:face,id=(\d+)\]", raw_text):
-            text_parts.append(decode_qq_face(m.group(1)))
+            context_text_parts.append(decode_qq_face(m.group(1)))
         for m in re.finditer(r"\[CQ:(?:image|mface|marketface)[^]]*url=([^,\]]+)", raw_text):
             clean_u = html.unescape(m.group(1)).strip()
             if clean_u not in image_urls: image_urls.append(clean_u)
